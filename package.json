@@ -1,0 +1,84 @@
+{
+  "name": "docuforge",
+  "version": "1.0.0",
+  "description": "Automatic documentary video generator — rule-based scripting, FFmpeg, Remotion, MoviePy",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "kill:vite": "lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true",
+    "kill:backend": "lsof -tiTCP:3847 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true",
+    "kill:ports": "npm run kill:vite && npm run kill:backend",
+    "dev": "npm run kill:ports && concurrently -k \"node backend/server.js\" \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "tsc -p tsconfig.electron.json && wait-on tcp:5173 tcp:3847 && cross-env NODE_ENV=development electron .",
+    "dev:backend": "npm run kill:backend && node backend/server.js",
+    "build": "tsc -p tsconfig.electron.json && vite build",
+    "build:electron": "npm run build && electron-builder",
+    "remotion:studio": "remotion studio remotion/index.ts",
+    "remotion:render": "remotion render remotion/index.ts Documentary out/preview.mp4",
+    "moviepy": "python3 backend/moviepy/moviepy_renderer.py",
+    "postinstall": "electron-builder install-app-deps && npx playwright install chromium",
+    "playwright:install": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@remotion/bundler": "^4.0.286",
+    "@remotion/cli": "^4.0.286",
+    "@remotion/player": "^4.0.286",
+    "@remotion/renderer": "^4.0.286",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "compromise": "^14.14.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "framer-motion": "^11.15.0",
+    "keyword-extractor": "^0.0.28",
+    "lucide-react": "^0.469.0",
+    "playwright": "^1.60.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.286",
+    "uuid": "^11.0.5",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.docuforge.app",
+    "productName": "DocuForge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "backend/**/*",
+      "remotion/**/*",
+      "projects/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

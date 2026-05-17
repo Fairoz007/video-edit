@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-electron/
+release/
+out/
+projects/*/
+!projects/.gitkeep
+cache/*
+!cache/.gitkeep
+exports/*
+!exports/.gitkeep
+.env
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
