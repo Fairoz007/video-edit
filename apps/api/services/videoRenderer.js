@@ -52,6 +52,67 @@ function scalePadFilter(w, h, cinematic = true) {
 /**
  * One-pass: scale, optional grade, mux narration (+ optional music), browser-safe encode.
  */
+/**
+ * Video-only export — scale/grade encode without narration mux.
+ */
+export async function exportVideoOnly({
+  videoPath,
+  outputPath,
+  preset = '1080p',
+  cinematic = true,
+}) {
+  if (!fs.existsSync(videoPath)) throw new Error(`Video not found: ${videoPath}`);
+
+  const { w, h } = RESOLUTIONS[preset] || RESOLUTIONS['1080p'];
+  const tempPath = path.join(
+    os.tmpdir(),
+    `docuforge-export-${Date.now()}-${path.basename(outputPath).replace(/[^\w.-]/g, '_')}`,
+  );
+  if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+  const vf = scalePadFilter(w, h, cinematic);
+
+  return new Promise((resolve, reject) => {
+    const cmd = ffmpeg()
+      .input(videoPath)
+      .videoFilters(vf)
+      .outputOptions([
+        '-c:v',
+        'libx264',
+        ...BROWSER_VIDEO_OPTS,
+        '-an',
+        '-movflags',
+        '+faststart',
+      ]);
+
+    const bin = findFfmpegPath();
+    if (bin) cmd.setFfmpegPath(bin);
+
+    cmd
+      .format('mp4')
+      .output(tempPath)
+      .on('end', async () => {
+        try {
+          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+          fs.renameSync(tempPath, outputPath);
+          const ok = await verifyVideoFile(outputPath);
+          if (!ok) {
+            reject(new Error('Export failed validation (incomplete or corrupt MP4)'));
+            return;
+          }
+          resolve(outputPath);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .on('error', (err) => {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        reject(err);
+      })
+      .run();
+  });
+}
+
 export async function exportDocumentary({
   videoPath,
   narrationPath,
@@ -62,6 +123,9 @@ export async function exportDocumentary({
   cinematic = true,
 }) {
   if (!fs.existsSync(videoPath)) throw new Error(`Video not found: ${videoPath}`);
+  if (!narrationPath) {
+    return exportVideoOnly({ videoPath, outputPath, preset, cinematic });
+  }
   if (!fs.existsSync(narrationPath)) throw new Error(`Narration not found: ${narrationPath}`);
 
   const { w, h } = RESOLUTIONS[preset] || RESOLUTIONS['1080p'];

@@ -12,13 +12,22 @@ export function createRenderRouter(root) {
 
     let id = projectId;
     if (!id) {
-      const project = await pipeline.createProject(input);
+      const project = await pipeline.createProject(input || {});
       id = project.id;
+    } else if (input) {
+      pipeline.mergeProjectInput(id, input);
     }
+
+    const pipelineOptions = {
+      ...(options || {}),
+      ...(input ? { input } : {}),
+      ...(input?.editMode ? { editMode: input.editMode } : {}),
+      ...(input?.editMode === 'video-only' ? { videoOnly: true } : {}),
+    };
 
     res.json({ projectId: id, status: 'queued' });
 
-    pipeline.runFullPipeline(id, options || {}).catch((err) => {
+    pipeline.runFullPipeline(id, pipelineOptions).catch((err) => {
       console.error('[Render]', err);
     });
   });

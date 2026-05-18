@@ -18,11 +18,19 @@ async function processQueue(root) {
     try {
       let projectId = job.projectId;
       if (!projectId) {
-        const p = await pipeline.createProject(job.input);
+        const p = await pipeline.createProject(job.input || {});
         projectId = p.id;
+      } else if (job.input) {
+        pipeline.mergeProjectInput(projectId, job.input);
       }
       job.projectId = projectId;
-      await pipeline.runFullPipeline(projectId, job.options || {}, (progress) => {
+      const pipelineOptions = {
+        ...(job.options || {}),
+        ...(job.input ? { input: job.input } : {}),
+        ...(job.input?.editMode ? { editMode: job.input.editMode } : {}),
+        ...(job.input?.editMode === 'video-only' ? { videoOnly: true } : {}),
+      };
+      await pipeline.runFullPipeline(projectId, pipelineOptions, (progress) => {
         job.progress = progress;
       });
       job.status = 'completed';

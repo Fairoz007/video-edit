@@ -15,7 +15,8 @@ import { writeSubtitles } from './subtitleGenerator.js';
 import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
 import { buildRemotionProps, renderRemotionPreview } from './remotionRenderer.js';
-import { exportDocumentary } from './videoRenderer.js';
+import { exportDocumentary, exportVideoOnly } from './videoRenderer.js';
+import { syncSectionDurationsFromAudio } from '../utils/sectionTiming.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValidate.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
@@ -31,7 +32,7 @@ export class RenderPipeline {
     const dir = projectDir(this.root, projectId);
     const project = {
       id: projectId,
-      input,
+      input: input || {},
       status: 'created',
       createdAt: new Date().toISOString(),
     };
@@ -39,10 +40,35 @@ export class RenderPipeline {
     return project;
   }
 
+  mergeProjectInput(projectId, input) {
+    if (!input || typeof input !== 'object') return null;
+    const projectPath = path.join(projectDir(this.root, projectId), 'project.json');
+    const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    project.input = { ...(project.input || {}), ...input };
+    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    return project;
+  }
+
   async runFullPipeline(projectId, options = {}, onProgress) {
     const dir = projectDir(this.root, projectId);
     const projectPath = path.join(dir, 'project.json');
-    const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    let project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+
+    if (options.input && typeof options.input === 'object') {
+      project.input = { ...(project.input || {}), ...options.input };
+      fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    }
+
+    const videoOnly =
+      project.input?.editMode === 'video-only' ||
+      options.editMode === 'video-only' ||
+      options.videoOnly === true;
+
+    if (videoOnly) {
+      project.input = { ...(project.input || {}), editMode: 'video-only' };
+      project.videoOnly = true;
+      fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    }
 
     const report = (stage, progress, message) => {
       onProgress?.({ projectId, stage, progress, message });
@@ -118,27 +144,45 @@ export class RenderPipeline {
         );
       }
 
-      // 4. Narration (~3:00 target)
-      report('narration', 35, 'Generating voice narration (3 min target)...');
-      const narrationResult = await generateNarrationForTargetDuration(
-        script.sections,
-        path.join(dir, 'audio'),
-        {
-          voice: options.voice || project.input?.voice,
-          rate: options.rate ?? project.input?.rate,
-          pitch: options.pitch ?? project.input?.pitch,
-        },
-      );
-      const { tracks, combinedPath, durationSec: audioDurationSec } = narrationResult;
-      project.narration = { tracks, combinedPath, audioDurationSec };
+      let tracks = [];
+      let combinedPath = null;
+      let audioDurationSec = null;
+
+      // 4. Narration (~3:00 target) — skipped in video-only edit mode
+      if (videoOnly) {
+        report('narration', 35, 'Skipped — video-only edit (no narration)');
+        project.narration = null;
+      } else {
+        report('narration', 35, 'Generating voice narration (3 min target)...');
+        const narrationResult = await generateNarrationForTargetDuration(
+          script.sections,
+          path.join(dir, 'audio'),
+          {
+            voice: options.voice || project.input?.voice,
+            rate: options.rate ?? project.input?.rate,
+            pitch: options.pitch ?? project.input?.pitch,
+          },
+        );
+        ({ tracks, combinedPath, durationSec: audioDurationSec } = narrationResult);
+        project.narration = { tracks, combinedPath, audioDurationSec };
+
+        script.sections = syncSectionDurationsFromAudio(script.sections, audioDurationSec);
+        project.script = script;
+        fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
+      }
 
       // 5. Subtitles (animated in Remotion + SRT fallback)
-      report('subtitles', 45, 'Creating animated subtitle cues...');
-      const { srtPath, cues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
-        introOffsetSec: REMOTION_INTRO_GRAPHIC_SEC,
-        audioDurationSec,
-      });
-      project.subtitleCues = cues;
+      if (videoOnly) {
+        report('subtitles', 45, 'Skipped — video-only edit');
+        project.subtitleCues = [];
+      } else {
+        report('subtitles', 45, 'Creating animated subtitle cues...');
+        const { cues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
+          introOffsetSec: REMOTION_INTRO_GRAPHIC_SEC,
+          audioDurationSec,
+        });
+        project.subtitleCues = cues;
+      }
 
       const videoStyle = project.input?.videoStyle || 'documentary';
       project.videoStyle = videoStyle;
@@ -160,7 +204,15 @@ export class RenderPipeline {
           totalDuration: walkthrough.totalDuration,
         };
       } else {
-        timeline = buildTimeline(script, manifest, tracks, { audioDurationSec });
+        timeline = buildTimeline(script, manifest, tracks, {
+          audioDurationSec,
+          videoOnly,
+          editMode: project.input?.editMode,
+        });
+        if (timeline.sections?.length) {
+          script.sections = timeline.sections;
+          project.script = script;
+        }
       }
       project.timeline = timeline;
       fs.mkdirSync(path.join(dir, 'timeline'), { recursive: true });
@@ -197,7 +249,7 @@ export class RenderPipeline {
         }
         const moviepyConfig = {
           scenes: moviepyScenes,
-          audio: combinedPath,
+          ...(combinedPath ? { audio: combinedPath } : {}),
           output: path.join(dir, 'renders', 'moviepy-output.mp4'),
           fps: 30,
           resolution: options.preset || '1080p',
@@ -219,14 +271,23 @@ export class RenderPipeline {
       const finalPath = path.join(this.root, 'exports', exportName);
       fs.mkdirSync(path.dirname(finalPath), { recursive: true });
 
-      await exportDocumentary({
-        videoPath,
-        narrationPath: combinedPath,
-        outputPath: finalPath,
-        musicPath: options.musicPath || null,
-        preset: options.preset || '1080p',
-        cinematic: true,
-      });
+      if (videoOnly) {
+        await exportVideoOnly({
+          videoPath,
+          outputPath: finalPath,
+          preset: options.preset || '1080p',
+          cinematic: true,
+        });
+      } else {
+        await exportDocumentary({
+          videoPath,
+          narrationPath: combinedPath,
+          outputPath: finalPath,
+          musicPath: options.musicPath || null,
+          preset: options.preset || '1080p',
+          cinematic: true,
+        });
+      }
 
       project.status = 'completed';
       project.outputPath = finalPath;

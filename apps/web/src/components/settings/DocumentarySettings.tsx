@@ -1,6 +1,19 @@
 import { Clapperboard } from 'lucide-react';
 import { useProjectStore } from '../../hooks/useProjectStore';
-import type { VideoStyle } from '../../utils/api';
+import type { EditMode, VideoStyle } from '../../utils/api';
+
+const EDIT_MODES: { id: EditMode; label: string; hint: string }[] = [
+  {
+    id: 'with-narration',
+    label: 'With narration',
+    hint: 'Script, voice-over, subtitles, synced timeline',
+  },
+  {
+    id: 'video-only',
+    label: 'Video only',
+    hint: 'Edit clips and timing — no TTS or narration track',
+  },
+];
 
 const VIDEO_STYLES: { id: VideoStyle; label: string; hint: string }[] = [
   {
@@ -27,6 +40,22 @@ export function DocumentarySettings() {
         <Clapperboard className="w-3.5 h-3.5 text-forge-accent" />
         Documentary Settings
       </h3>
+
+      <label className="block text-[10px] text-gray-500 mb-1">Edit mode</label>
+      <select
+        className="input-field text-xs mb-2.5 w-full"
+        value={input.editMode || 'with-narration'}
+        onChange={(e) => setInput({ editMode: e.target.value as EditMode })}
+      >
+        {EDIT_MODES.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <p className="text-[9px] text-gray-600 mb-2.5 -mt-1">
+        {EDIT_MODES.find((m) => m.id === (input.editMode || 'with-narration'))?.hint}
+      </p>
 
       <label className="block text-[10px] text-gray-500 mb-1">Composition</label>
       <select className="input-field text-xs mb-2.5">

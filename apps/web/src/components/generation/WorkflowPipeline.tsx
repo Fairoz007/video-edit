@@ -1,6 +1,7 @@
 import { FileText, Image, Mic, Layers, Rocket } from 'lucide-react';
 import { WorkflowCard } from '../ui/WorkflowCard';
 import { useProjectStore } from '../../hooks/useProjectStore';
+import { isVideoOnlyEditMode } from '../../utils/timelineSync';
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -9,7 +10,8 @@ function formatDuration(seconds: number): string {
 }
 
 export function WorkflowPipeline() {
-  const { script, media, timeline, status, progress } = useProjectStore();
+  const { script, media, timeline, status, progress, input } = useProjectStore();
+  const videoOnly = isVideoOnlyEditMode(input.editMode);
 
   const sectionCount = script?.sections.length ?? 0;
   const mediaCount = media.length;
@@ -19,7 +21,13 @@ export function WorkflowPipeline() {
 
   const scriptProgress = sectionCount > 0 ? 100 : 0;
   const mediaProgress = mediaCount > 0 ? Math.min(100, mediaCount * 2) : sectionCount > 0 ? 35 : 0;
-  const narrationProgress = narrationSec > 0 ? 100 : sectionCount > 0 ? 50 : 0;
+  const narrationProgress = videoOnly
+    ? 100
+    : narrationSec > 0
+      ? 100
+      : sectionCount > 0
+        ? 50
+        : 0;
   const timelineProgress = sceneCount > 0 ? 100 : script ? 60 : 0;
   const renderProgress =
     status === 'completed' ? 100 : status === 'rendering' ? progress : status === 'generating' ? 40 : 0;
@@ -48,9 +56,19 @@ export function WorkflowPipeline() {
     {
       step: 3,
       title: 'Narration',
-      subtitle: narrationSec ? formatDuration(narrationSec) : 'TTS pipeline',
+      subtitle: videoOnly
+        ? 'Skipped (video only)'
+        : narrationSec
+          ? formatDuration(narrationSec)
+          : 'TTS pipeline',
       progress: narrationProgress,
-      status: (narrationSec ? 'complete' : sectionCount ? 'active' : 'idle') as const,
+      status: (videoOnly
+        ? 'complete'
+        : narrationSec
+          ? 'complete'
+          : sectionCount
+            ? 'active'
+            : 'idle') as const,
       icon: Mic,
     },
     {

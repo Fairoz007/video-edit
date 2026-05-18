@@ -124,8 +124,13 @@ export function createPipelineRouter(root) {
   });
 
   router.post('/timeline', (req, res) => {
-    const { script, media, audioTracks } = req.body;
-    res.json(buildTimeline(script, media, audioTracks));
+    const { script, media, audioTracks, audioDurationSec, editMode } = req.body;
+    const timeline = buildTimeline(script, media, audioTracks, {
+      audioDurationSec,
+      editMode,
+      videoOnly: editMode === 'video-only',
+    });
+    res.json(timeline);
   });
 
   router.get('/project/:id/script', (req, res) => {

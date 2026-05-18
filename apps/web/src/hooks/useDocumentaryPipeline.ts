@@ -120,8 +120,12 @@ export function useDocumentaryPipeline() {
             script,
             media: store.media,
             audioTracks: [],
+            editMode: input.editMode || 'with-narration',
           });
           store.setTimeline(timeline);
+          if (timeline.sections?.length) {
+            store.setScript({ ...script, sections: timeline.sections });
+          }
         }
         store.setStatus('idle');
       } catch (e) {
@@ -159,12 +163,17 @@ export function useDocumentaryPipeline() {
 
         const script = useProjectStore.getState().script;
         if (script) {
+          const { editMode } = useProjectStore.getState().input;
           const { data: timeline } = await buildTimeline({
             script,
             media,
             audioTracks: [],
+            editMode: editMode || 'with-narration',
           });
           store.setTimeline(timeline);
+          if (timeline.sections?.length) {
+            store.setScript({ ...script, sections: timeline.sections });
+          }
         }
 
         return `Scraped ${media.length} asset(s) from "${title}"`;
@@ -195,16 +204,20 @@ export function useDocumentaryPipeline() {
     try {
       const input = normalizedInput();
       const { voiceSettings, exportOptions, projectId } = useProjectStore.getState();
+      const editMode = input.editMode || 'with-narration';
       const { data } = await startRender({
         projectId: projectId || undefined,
         input: {
           ...input,
+          editMode,
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
           pitch: voiceSettings.pitch,
         },
         options: {
           ...exportOptions,
+          editMode,
+          videoOnly: editMode === 'video-only',
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
           pitch: voiceSettings.pitch,

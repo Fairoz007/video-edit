@@ -121,6 +121,9 @@ export const addToQueue = (job: object) => api.post('/queue/add', job);
 
 export type VideoStyle = 'documentary' | 'walkthrough';
 
+/** `with-narration` = full documentary pipeline; `video-only` = edit clips without TTS. */
+export type EditMode = 'with-narration' | 'video-only';
+
 export interface DocumentaryInput {
   topic?: string;
   articleUrl?: string;
@@ -129,6 +132,7 @@ export interface DocumentaryInput {
   rate?: number;
   pitch?: number;
   videoStyle?: VideoStyle;
+  editMode?: EditMode;
   templateId?: string;
 }
 

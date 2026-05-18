@@ -105,7 +105,15 @@ export function writeSubtitles(sections, outputDir, options = {}) {
     cues = scaleCuesToDuration(cues, options.audioDurationSec, introOffset);
   }
 
-  const srt = generateSRT(sections);
+  const srt =
+    cues.length > 0
+      ? cues
+          .map(
+            (cue, i) =>
+              `${i + 1}\n${formatSrtTime(cue.startSec)} --> ${formatSrtTime(cue.endSec)}\n${wrapText(cue.text)}\n`,
+          )
+          .join('\n')
+      : generateSRT(sections);
   const srtPath = path.join(outputDir, 'subtitles.srt');
   fs.writeFileSync(srtPath, srt, 'utf8');
 

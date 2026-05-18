@@ -104,7 +104,10 @@ export function buildWalkthroughProps(project) {
   return {
     projectName: walkthrough?.projectName || script?.topic || 'Walkthrough',
     screens: screens.filter((s) => s.src),
-    narrationAudioSrc: project.narration?.combinedPath || undefined,
+    narrationAudioSrc:
+      project.input?.editMode === 'video-only'
+        ? undefined
+        : project.narration?.combinedPath || undefined,
     fps: 30,
     width: 1920,
     height: 1080,
@@ -147,7 +150,10 @@ export function buildRemotionProps(project) {
     introGraphicSec: REMOTION_INTRO_GRAPHIC_SEC,
     outroGraphicSec: REMOTION_OUTRO_GRAPHIC_SEC,
     channelName: process.env.CHANNEL_NAME || script?.topic || 'DocuForge',
-    narrationAudioSrc: project.narration?.combinedPath || undefined,
+    narrationAudioSrc:
+      project.input?.editMode === 'video-only'
+        ? undefined
+        : project.narration?.combinedPath || undefined,
     fps: 30,
     width: 1920,
     height: 1080,

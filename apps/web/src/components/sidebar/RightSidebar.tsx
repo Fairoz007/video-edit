@@ -10,6 +10,7 @@ import { ScenesPanel } from '../panels/ScenesPanel';
 import { InspectorPanel } from '../panels/InspectorPanel';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
+import { isVideoOnlyEditMode } from '../../utils/timelineSync';
 import { useUiStore } from '../../hooks/useUiStore';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 
@@ -30,6 +31,7 @@ export function RightSidebar({ overlay }: Props) {
   const [tab, setTab] = useState<TabId>('settings');
   const { status, exportOptions, voiceSettings, input } = useProjectStore();
   const { startRenderFlow } = useDocumentaryPipeline();
+  const videoOnly = isVideoOnlyEditMode(input.editMode);
   const { rightPanelOpen, mobilePanel, closeMobilePanels, setMobilePanel } = useUiStore();
   const bp = useBreakpoint();
 
@@ -79,7 +81,7 @@ export function RightSidebar({ overlay }: Props) {
               className="space-y-3"
             >
               <DocumentarySettings />
-              <VoiceSettings />
+              {!videoOnly && <VoiceSettings />}
               <MusicControls />
               <ExportSettings />
             </motion.div>
@@ -117,7 +119,8 @@ export function RightSidebar({ overlay }: Props) {
           </span>
         </motion.button>
         <p className="text-[9px] text-center text-gray-600 mt-2">
-          {input.videoStyle || 'documentary'} · {exportOptions.preset} · {voiceSettings.rate} WPM
+          {videoOnly ? 'video only' : `${voiceSettings.rate} WPM`} · {input.videoStyle || 'documentary'}{' '}
+          · {exportOptions.preset}
         </p>
       </motion.div>
     </div>

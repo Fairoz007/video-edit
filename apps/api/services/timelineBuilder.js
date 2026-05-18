@@ -7,6 +7,7 @@ import {
   REMOTION_OUTRO_GRAPHIC_SEC,
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
+import { syncSectionsToVideoTimeline } from '../utils/sectionTiming.js';
 
 const CONTENT_DURATION =
   TARGET_VIDEO_DURATION_SEC - REMOTION_INTRO_GRAPHIC_SEC - REMOTION_OUTRO_GRAPHIC_SEC;
@@ -24,8 +25,10 @@ function expandMediaPool(manifest, minClips) {
 }
 
 export function buildTimeline(script, mediaManifest, audioTracks, options = {}) {
+  const videoOnly =
+    options.videoOnly === true || options.editMode === 'video-only';
   const sectionCount = Math.max(1, script.sections.length);
-  const audioDurationSec = options.audioDurationSec;
+  const audioDurationSec = videoOnly ? null : options.audioDurationSec;
 
   const contentTarget =
     audioDurationSec && audioDurationSec > 30 ? audioDurationSec : CONTENT_DURATION;
@@ -34,7 +37,12 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   const pool = expandMediaPool(mediaManifest, minClips);
   const mediaPerSection = Math.max(2, Math.floor(pool.length / sectionCount));
 
-  const sectionDurations = script.sections.map(
+  let sections = script.sections;
+  if (videoOnly) {
+    sections = syncSectionsToVideoTimeline(sections, [], contentTarget);
+  }
+
+  const sectionDurations = sections.map(
     (s) => s.durationEstimate || contentTarget / sectionCount,
   );
   const narrationTotal = sectionDurations.reduce((a, b) => a + b, 0);
@@ -45,7 +53,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   let timeCursor = REMOTION_INTRO_GRAPHIC_SEC;
 
   for (let i = 0; i < sectionCount; i++) {
-    const section = script.sections[i];
+    const section = sections[i];
     const sectionDuration = sectionDurations[i] * scale;
     const clipCount = Math.min(mediaPerSection, pool.length);
     const clipDuration = sectionDuration / clipCount;
@@ -53,34 +61,40 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     for (let j = 0; j < clipCount; j++) {
       const asset = pool[mediaIndex % pool.length];
       mediaIndex++;
+      const duration = Math.max(2.5, clipDuration);
       scenes.push({
         id: `scene-${i}-${j}`,
         sectionId: section.id,
         start: timeCursor,
-        duration: Math.max(2.5, clipDuration),
+        duration,
         media: asset,
         transition: TRANSITIONS[(i + j) % TRANSITIONS.length],
         effect: asset.type === 'image' ? 'ken-burns' : 'none',
-        narration: j === 0 ? section.narration : '',
+        narration: videoOnly ? '' : j === 0 ? section.narration : '',
         sectionTitle: j === 0 ? section.title : undefined,
       });
-      timeCursor += clipDuration;
+      timeCursor += duration;
     }
   }
 
+  const contentEnd = Math.max(0, timeCursor - REMOTION_INTRO_GRAPHIC_SEC);
   const totalDuration =
-    REMOTION_INTRO_GRAPHIC_SEC + contentTarget + REMOTION_OUTRO_GRAPHIC_SEC;
+    REMOTION_INTRO_GRAPHIC_SEC + contentEnd + REMOTION_OUTRO_GRAPHIC_SEC;
+
+  const syncedSections = syncSectionsToVideoTimeline(sections, scenes, contentEnd);
 
   return {
     scenes,
     totalDuration,
-    contentDuration: contentTarget,
+    contentDuration: contentEnd,
     audioDurationSec: audioDurationSec || null,
+    videoOnly,
+    sections: syncedSections,
     fps: 30,
     tracks: {
       video: scenes,
-      audio: audioTracks || [],
-      subtitles: script.sections,
+      audio: videoOnly ? [] : audioTracks || [],
+      subtitles: videoOnly ? [] : syncedSections,
     },
   };
 }

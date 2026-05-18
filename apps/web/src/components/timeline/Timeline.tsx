@@ -4,9 +4,11 @@ import { GlassPanel } from '../ui/GlassPanel';
 import { TimelineToolbar } from './TimelineToolbar';
 import { TimelineTrack } from './TimelineTrack';
 import { useProjectStore } from '../../hooks/useProjectStore';
+import { buildNarrationTrackItems, isVideoOnlyEditMode } from '../../utils/timelineSync';
 
 export function Timeline() {
-  const { timeline, script } = useProjectStore();
+  const { timeline, script, input } = useProjectStore();
+  const videoOnly = isVideoOnlyEditMode(input.editMode);
   const [zoom, setZoom] = useState(1);
   const [playhead, setPlayhead] = useState(0);
 
@@ -25,14 +27,9 @@ export function Timeline() {
         }))
       : [];
 
-  const narrationItems = (script?.sections ?? []).map((sec, i, arr) => ({
-    id: sec.id,
-    start: i * (totalDuration / Math.max(arr.length, 1)),
-    duration: sec.durationEstimate,
-    label: sec.title,
-    color: 'from-emerald-600 to-teal-600',
-    waveform: true,
-  }));
+  const narrationItems = videoOnly
+    ? []
+    : buildNarrationTrackItems(script?.sections ?? [], scenes, totalDuration);
 
   const hasContent = videoItems.length > 0 || narrationItems.length > 0;
 

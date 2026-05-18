@@ -14,6 +14,7 @@ import { GlassPanel } from '../ui/GlassPanel';
 import { WorkflowPipeline } from '../generation/WorkflowPipeline';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { useDocumentaryPipeline, type InputTab } from '../../hooks/useDocumentaryPipeline';
+import { isVideoOnlyEditMode } from '../../utils/timelineSync';
 
 export function TopicInput() {
   const [tab, setTab] = useState<InputTab>('article');
@@ -22,6 +23,7 @@ export function TopicInput() {
   const [scrapeInfo, setScrapeInfo] = useState<string | null>(null);
   const { status, input, setInput } = useProjectStore();
   const { generateScriptFlow, scrapeMediaFlow, startRenderFlow } = useDocumentaryPipeline();
+  const videoOnly = isVideoOnlyEditMode(input.editMode);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -49,7 +51,11 @@ export function TopicInput() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">
             AI Documentary Generator
           </h2>
-          <p className="text-[10px] text-gray-600">Script → Media → Narration → Timeline → Render</p>
+          <p className="text-[10px] text-gray-600">
+            {videoOnly
+              ? 'Script → Media → Timeline (video only) → Render'
+              : 'Script → Media → Narration → Timeline → Render'}
+          </p>
         </div>
         <button
           type="button"
