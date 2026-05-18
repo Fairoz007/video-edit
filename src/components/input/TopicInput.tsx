@@ -9,6 +9,7 @@ import {
   scrapeUrlFull,
 } from '../../utils/api';
 import { useRenderPolling } from '../../hooks/useRenderPolling';
+import { isValidHttpUrl, normalizeHttpUrlInput } from '../../utils/urls';
 
 type Tab = 'topic' | 'article' | 'youtube';
 
@@ -32,19 +33,9 @@ export function TopicInput() {
 
   useRenderPolling(projectId, status === 'rendering');
 
-  const isValidUrl = (value?: string) => {
-    if (!value?.trim()) return true;
-    try {
-      const u = new URL(value.trim());
-      return u.protocol === 'http:' || u.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
   const handleGenerate = async () => {
     const urlField = tab === 'article' ? input.articleUrl : tab === 'youtube' ? input.youtubeUrl : undefined;
-    if (urlField?.trim() && !isValidUrl(urlField)) {
+    if (urlField?.trim() && !isValidHttpUrl(urlField)) {
       setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
       return;
     }
@@ -54,17 +45,15 @@ export function TopicInput() {
     try {
       const { data: script } = await generateScript({
         ...input,
-        articleUrl: input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
-        youtubeUrl: input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
+        articleUrl: normalizeHttpUrlInput(input.articleUrl),
+        youtubeUrl: normalizeHttpUrlInput(input.youtubeUrl),
       });
       setScript(script);
       const { data: kw } = await extractKeywords({
         text: script.fullNarration,
         topic: input.topic || script.topic,
-        articleUrl:
-          input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
-        youtubeUrl:
-          input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
+        articleUrl: normalizeHttpUrlInput(input.articleUrl),
+        youtubeUrl: normalizeHttpUrlInput(input.youtubeUrl),
       });
       setKeywords(kw);
     } catch (err) {
@@ -80,7 +69,7 @@ export function TopicInput() {
 
   const handleScrapeMedia = async () => {
     if (!sourceUrl) return;
-    if (!isValidUrl(sourceUrl)) {
+    if (!isValidHttpUrl(sourceUrl)) {
       setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
       return;
     }
@@ -104,7 +93,7 @@ export function TopicInput() {
 
   const handleRender = async () => {
     const urlField = tab === 'article' ? input.articleUrl : tab === 'youtube' ? input.youtubeUrl : undefined;
-    if (urlField?.trim() && !isValidUrl(urlField)) {
+    if (urlField?.trim() && !isValidHttpUrl(urlField)) {
       setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
       return;
     }
@@ -114,8 +103,8 @@ export function TopicInput() {
       const { data } = await startRender({
         input: {
           ...input,
-          articleUrl: input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
-          youtubeUrl: input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
+          articleUrl: normalizeHttpUrlInput(input.articleUrl),
+          youtubeUrl: normalizeHttpUrlInput(input.youtubeUrl),
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
         },
