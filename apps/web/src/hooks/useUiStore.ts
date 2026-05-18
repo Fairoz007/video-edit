@@ -1,0 +1,63 @@
+import { create } from 'zustand';
+import type { Breakpoint } from './useBreakpoint';
+
+export type MobilePanel = 'none' | 'left' | 'right';
+
+interface UiState {
+  leftPanelOpen: boolean;
+  rightPanelOpen: boolean;
+  mobilePanel: MobilePanel;
+  syncLayout: (bp: Breakpoint) => void;
+  setLeftPanelOpen: (open: boolean) => void;
+  setRightPanelOpen: (open: boolean) => void;
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
+  setMobilePanel: (panel: MobilePanel) => void;
+  closeMobilePanels: () => void;
+}
+
+export const useUiStore = create<UiState>((set, get) => ({
+  leftPanelOpen: true,
+  rightPanelOpen: true,
+  mobilePanel: 'none',
+
+  syncLayout: (bp) => {
+    if (bp === 'desktop') {
+      set({ leftPanelOpen: true, rightPanelOpen: true, mobilePanel: 'none' });
+    } else if (bp === 'tablet') {
+      set({ leftPanelOpen: true, rightPanelOpen: false, mobilePanel: 'none' });
+    } else {
+      set({ leftPanelOpen: false, rightPanelOpen: false, mobilePanel: 'none' });
+    }
+  },
+
+  setLeftPanelOpen: (open) => set({ leftPanelOpen: open, mobilePanel: open ? 'left' : 'none' }),
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open, mobilePanel: open ? 'right' : 'none' }),
+
+  toggleLeftPanel: () => {
+    const { mobilePanel, leftPanelOpen } = get();
+    if (mobilePanel !== 'none') {
+      set({ mobilePanel: mobilePanel === 'left' ? 'none' : 'left', leftPanelOpen: mobilePanel !== 'left' });
+    } else {
+      set({ leftPanelOpen: !leftPanelOpen });
+    }
+  },
+
+  toggleRightPanel: () => {
+    const { mobilePanel, rightPanelOpen } = get();
+    if (mobilePanel !== 'none') {
+      set({ mobilePanel: mobilePanel === 'right' ? 'none' : 'right', rightPanelOpen: mobilePanel !== 'right' });
+    } else {
+      set({ rightPanelOpen: !rightPanelOpen });
+    }
+  },
+
+  setMobilePanel: (panel) =>
+    set({
+      mobilePanel: panel,
+      leftPanelOpen: panel === 'left',
+      rightPanelOpen: panel === 'right',
+    }),
+
+  closeMobilePanels: () => set({ mobilePanel: 'none', leftPanelOpen: false, rightPanelOpen: false }),
+}));

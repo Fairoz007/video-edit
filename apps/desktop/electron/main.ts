@@ -10,7 +10,9 @@ const isDev = process.env.NODE_ENV === 'development';
 let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess | null = null;
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = process.env.DOCUFORGE_ROOT
+  ? path.resolve(process.env.DOCUFORGE_ROOT)
+  : path.join(__dirname, '../../..');
 const PROJECTS_DIR = path.join(ROOT, 'projects');
 const CACHE_DIR = path.join(ROOT, 'cache');
 const EXPORTS_DIR = path.join(ROOT, 'exports');
@@ -25,7 +27,7 @@ const BACKEND_PORT = process.env.BACKEND_PORT || '3847';
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 
 function startBackend() {
-  const serverPath = path.join(ROOT, 'backend', 'server.js');
+  const serverPath = path.join(ROOT, 'apps', 'api', 'server.js');
   if (!fs.existsSync(serverPath)) return;
   backendProcess = fork(serverPath, [], {
     env: { ...process.env, DOCUFORGE_ROOT: ROOT, BACKEND_PORT },
@@ -66,7 +68,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(ROOT, 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(ROOT, 'apps', 'web', 'dist', 'index.html'));
   }
 
   mainWindow.on('closed', () => {

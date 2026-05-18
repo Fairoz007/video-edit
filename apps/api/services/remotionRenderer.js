@@ -13,9 +13,10 @@ import {
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { getRepoRoot } from '@docuforge/config/repoRoot';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '../..');
+const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
+const REMOTION_ENTRY = path.join(ROOT, 'packages', 'remotion', 'index.ts');
 
 function isAbsoluteAssetPath(src) {
   return path.isAbsolute(src) || /^[a-zA-Z]:\\/.test(src);
@@ -154,9 +155,9 @@ export function buildRemotionProps(project) {
 }
 
 export async function renderRemotionPreview(props, outputPath, options = {}) {
-  const entry = path.join(ROOT, 'remotion', 'index.ts');
+  const entry = REMOTION_ENTRY;
   if (!fs.existsSync(entry)) {
-    throw new Error('Remotion entry not found at remotion/index.ts');
+    throw new Error(`Remotion entry not found at ${entry}`);
   }
 
   const compositionId = options.compositionId || 'Documentary';

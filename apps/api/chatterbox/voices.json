@@ -1,0 +1,95 @@
+{
+  "defaultVoice": "chatterbox-turbo",
+  "voices": [
+    {
+      "id": "chatterbox-turbo",
+      "name": "Chatterbox Turbo",
+      "locale": "en",
+      "label": "Chatterbox Turbo (English)",
+      "engine": "turbo",
+      "language": "en",
+      "description": "Built-in ResembleAI/chatterbox-turbo voice — paralinguistic tags [laugh] [chuckle]"
+    },
+    {
+      "id": "chatterbox-turbo-narrator",
+      "name": "Turbo Narrator",
+      "locale": "en",
+      "label": "Chatterbox Turbo — Documentary",
+      "engine": "turbo",
+      "language": "en",
+      "exaggeration": 0.35
+    },
+    {
+      "id": "chatterbox-turbo-expressive",
+      "name": "Turbo Expressive",
+      "locale": "en",
+      "label": "Chatterbox Turbo — Expressive",
+      "engine": "turbo",
+      "language": "en",
+      "exaggeration": 0.55
+    },
+    {
+      "id": "chatterbox-multilingual-v3-en",
+      "name": "Multilingual v3 EN",
+      "locale": "en",
+      "label": "Chatterbox Multilingual v3 — English",
+      "engine": "multilingual",
+      "language": "en",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-fr",
+      "name": "Multilingual v3 FR",
+      "locale": "fr",
+      "label": "Chatterbox Multilingual v3 — French",
+      "engine": "multilingual",
+      "language": "fr",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-es",
+      "name": "Multilingual v3 ES",
+      "locale": "es",
+      "label": "Chatterbox Multilingual v3 — Spanish",
+      "engine": "multilingual",
+      "language": "es",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-de",
+      "name": "Multilingual v3 DE",
+      "locale": "de",
+      "label": "Chatterbox Multilingual v3 — German",
+      "engine": "multilingual",
+      "language": "de",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-zh",
+      "name": "Multilingual v3 ZH",
+      "locale": "zh",
+      "label": "Chatterbox Multilingual v3 — Chinese",
+      "engine": "multilingual",
+      "language": "zh",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-ja",
+      "name": "Multilingual v3 JA",
+      "locale": "ja",
+      "label": "Chatterbox Multilingual v3 — Japanese",
+      "engine": "multilingual",
+      "language": "ja",
+      "t3Model": "v3"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-hi",
+      "name": "Multilingual v3 HI",
+      "locale": "hi",
+      "label": "Chatterbox Multilingual v3 — Hindi",
+      "engine": "multilingual",
+      "language": "hi",
+      "t3Model": "v3"
+    }
+  ]
+}

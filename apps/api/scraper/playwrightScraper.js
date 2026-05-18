@@ -8,6 +8,11 @@ import axios from 'axios';
 import { pipeline } from 'stream/promises';
 import { withPage } from './playwrightBrowser.js';
 import { parseYouTubeUrl } from './urlScraper.js';
+import {
+  MIN_VIDEO_BYTES,
+  verifyReadableImage,
+  verifyReadableVideo,
+} from '../utils/mediaValidate.js';
 
 const NAV_TIMEOUT = 30000;
 const MIN_IMAGE_BYTES = 25000;
@@ -225,14 +230,47 @@ export async function downloadPageMedia(url, destDir, options = {}) {
     const dest = path.join(destDir, filename);
 
     if (fs.existsSync(dest)) {
-      manifest.push({ ...item, localPath: dest, filename });
-      count++;
+      const existingOk = isVideo
+        ? await verifyReadableVideo(dest)
+        : verifyReadableImage(dest);
+      if (existingOk) {
+        manifest.push({
+          ...item,
+          type: isVideo ? 'video' : 'image',
+          localPath: dest,
+          filename,
+        });
+        count++;
+      } else {
+        fs.unlinkSync(dest);
+      }
       continue;
     }
 
     try {
       const bytes = await downloadToFile(item.url, dest);
-      if (!isVideo && bytes < MIN_IMAGE_BYTES) {
+      if (isVideo) {
+        if (bytes < MIN_VIDEO_BYTES) {
+          fs.unlinkSync(dest);
+          continue;
+        }
+        if (!(await verifyReadableVideo(dest))) {
+          if (verifyReadableImage(dest)) {
+            manifest.push({
+              ...item,
+              type: 'image',
+              localPath: dest,
+              filename,
+              bytes,
+            });
+            count++;
+          } else {
+            fs.unlinkSync(dest);
+            console.warn(`[playwright] Invalid video skipped: ${item.url}`);
+          }
+          continue;
+        }
+      } else if (bytes < MIN_IMAGE_BYTES || !verifyReadableImage(dest)) {
         fs.unlinkSync(dest);
         continue;
       }

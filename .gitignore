@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-electron/
+apps/web/dist/
+apps/desktop/dist-electron/
 release/
 out/
 projects/*/

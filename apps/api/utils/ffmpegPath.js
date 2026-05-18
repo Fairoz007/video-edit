@@ -44,6 +44,31 @@ export function hasFfmpeg() {
   return Boolean(findFfmpegPath());
 }
 
+/** ffprobe next to bundled/system ffmpeg, or on PATH. */
+export function findFfprobePath() {
+  const ffmpegBin = findFfmpegPath();
+  if (ffmpegBin && ffmpegBin !== 'ffmpeg') {
+    const sibling = ffmpegBin.replace(/ffmpeg$/i, 'ffprobe');
+    if (fs.existsSync(sibling)) return sibling;
+  }
+  for (const candidate of [
+    process.env.FFPROBE_PATH,
+    '/opt/homebrew/bin/ffprobe',
+    '/usr/local/bin/ffprobe',
+    '/usr/bin/ffprobe',
+    'ffprobe',
+  ]) {
+    try {
+      if (candidate !== 'ffprobe' && !fs.existsSync(candidate)) continue;
+      execFileSync(candidate, ['-version'], { stdio: 'ignore' });
+      return candidate;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
 export function initFfmpeg() {
   const found = findFfmpegPath();
   if (found) {

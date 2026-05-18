@@ -17,6 +17,8 @@ export const healthCheck = () =>
 // Projects
 export const listProjects = () => api.get('/projects');
 export const getProject = (id: string) => api.get(`/projects/${id}`);
+export const cleanWorkspace = () =>
+  api.delete<{ ok: boolean; removed: Record<string, number> }>('/projects/workspace');
 export const createProject = (input: DocumentaryInput) =>
   api.post('/projects', { input });
 
@@ -38,9 +40,33 @@ export interface SystemVoice {
   label: string;
 }
 
+export interface TtsHealth {
+  ok?: boolean;
+  device?: string;
+  cuda?: boolean;
+  error?: string;
+}
+
 export const listVoices = () =>
-  api.get<{ platform: string; voices: SystemVoice[]; defaultVoice: string | null }>(
-    '/pipeline/voices',
+  api.get<{
+    platform: string;
+    voices: SystemVoice[];
+    defaultVoice: string | null;
+    provider?: string;
+    tts?: TtsHealth;
+    paralinguisticTags?: string[];
+  }>('/pipeline/voices');
+
+export const previewVoice = (payload: {
+  voice?: string;
+  rate?: number;
+  pitch?: number;
+  text?: string;
+}) =>
+  api.post<{ url: string; voice: string; rate: number; pitch: number }>(
+    '/pipeline/voice/preview',
+    payload,
+    { timeout: 600_000 },
   );
 
 // Media
@@ -70,6 +96,11 @@ export const startRender = (payload: {
 export const getRenderStatus = (projectId: string) =>
   api.get(`/render/status/${projectId}`);
 
+export const getLatestExport = () =>
+  api.get<{ filename: string | null; outputPath: string | null; size?: number }>(
+    '/exports/latest',
+  );
+
 // Queue
 export const getQueue = () => api.get('/queue');
 export const addToQueue = (job: object) => api.post('/queue/add', job);
@@ -82,6 +113,7 @@ export interface DocumentaryInput {
   youtubeUrl?: string;
   voice?: string;
   rate?: number;
+  pitch?: number;
   videoStyle?: VideoStyle;
   templateId?: string;
 }
@@ -92,6 +124,7 @@ export interface ExportOptions {
   musicPath?: string;
   voice?: string;
   rate?: number;
+  pitch?: number;
 }
 
 export interface ScriptSection {

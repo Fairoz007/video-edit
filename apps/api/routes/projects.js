@@ -3,8 +3,34 @@ import fs from 'fs';
 import path from 'path';
 import { projectDir } from '../utils/paths.js';
 
+function cleanWorkspaceDir(dirPath) {
+  if (!fs.existsSync(dirPath)) return 0;
+  let removed = 0;
+  for (const name of fs.readdirSync(dirPath)) {
+    if (name === '.gitkeep') continue;
+    fs.rmSync(path.join(dirPath, name), { recursive: true, force: true });
+    removed++;
+  }
+  return removed;
+}
+
 export function createProjectRouter(root) {
   const router = Router();
+
+  /** Remove all projects, cache, exports, and out artifacts (keeps .gitkeep). */
+  router.delete('/workspace', (_req, res) => {
+    try {
+      const counts = {
+        projects: cleanWorkspaceDir(path.join(root, 'projects')),
+        cache: cleanWorkspaceDir(path.join(root, 'cache')),
+        exports: cleanWorkspaceDir(path.join(root, 'exports')),
+        out: cleanWorkspaceDir(path.join(root, 'out')),
+      };
+      res.json({ ok: true, removed: counts });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   router.get('/', (_req, res) => {
     const projectsPath = path.join(root, 'projects');

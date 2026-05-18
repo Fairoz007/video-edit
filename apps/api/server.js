@@ -13,10 +13,11 @@ import { createMediaRouter } from './routes/media.js';
 import { createRenderRouter } from './routes/render.js';
 import { createQueueRouter } from './routes/queue.js';
 import { createScrapeRouter } from './routes/scrape.js';
+import { createExportsRouter } from './routes/exports.js';
 import { initFfmpeg } from './utils/ffmpegPath.js';
+import { getRepoRoot } from '@docuforge/config/repoRoot';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = process.env.DOCUFORGE_ROOT || path.join(__dirname, '..');
+const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
 
 dotenv.config({ path: path.join(ROOT, '.env') });
 initFfmpeg();
@@ -47,6 +48,7 @@ app.use('/api/pipeline', createPipelineRouter(ROOT));
 app.use('/api/render', createRenderRouter(ROOT));
 app.use('/api/queue', createQueueRouter(ROOT));
 app.use('/api/scrape', createScrapeRouter(ROOT));
+app.use('/api/exports', createExportsRouter(ROOT));
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   const providers = [
@@ -59,6 +61,9 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[DocuForge] Media APIs: ${providers.length ? providers.join(', ') : 'none configured'}`);
   console.log(
     `[DocuForge] Script: ${process.env.GROQ_API_KEY ? `Groq (${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'})` : 'rule-based fallback'}`,
+  );
+  console.log(
+    `[DocuForge] TTS: Chatterbox-Turbo + Multilingual v3 (python: ${process.env.CHATTERBOX_PYTHON || 'python3.11'})`,
   );
 });
 

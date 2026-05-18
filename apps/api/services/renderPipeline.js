@@ -17,6 +17,7 @@ import { runMoviePyPipeline } from './moviepyBridge.js';
 import { buildRemotionProps, renderRemotionPreview } from './remotionRenderer.js';
 import { exportDocumentary } from './videoRenderer.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValidate.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
 
 export class RenderPipeline {
@@ -110,7 +111,12 @@ export class RenderPipeline {
         ...scrapedMedia.filter((m) => m.localPath),
         ...stockManifest,
       ];
-      project.media = manifest;
+      project.media = await sanitizeMediaManifest(manifest);
+      if (project.media.length < manifest.length) {
+        console.warn(
+          `[Pipeline] Dropped ${manifest.length - project.media.length} invalid media file(s)`,
+        );
+      }
 
       // 4. Narration (~3:00 target)
       report('narration', 35, 'Generating voice narration (3 min target)...');
@@ -120,6 +126,7 @@ export class RenderPipeline {
         {
           voice: options.voice || project.input?.voice,
           rate: options.rate ?? project.input?.rate,
+          pitch: options.pitch ?? project.input?.pitch,
         },
       );
       const { tracks, combinedPath, durationSec: audioDurationSec } = narrationResult;
@@ -184,14 +191,12 @@ export class RenderPipeline {
       } catch (err) {
         console.warn('[Pipeline] Remotion failed, falling back to MoviePy:', err.message);
         report('moviepy', 58, 'MoviePy clip sequencing...');
+        const moviepyScenes = await prepareMoviePyScenes(timeline.scenes);
+        if (!moviepyScenes.length) {
+          throw new Error('No valid media clips for MoviePy — check scraped/downloaded assets');
+        }
         const moviepyConfig = {
-          scenes: timeline.scenes.map((s, i) => ({
-            path: s.media?.localPath,
-            duration: s.duration,
-            type: s.media?.type || 'image',
-            transition: s.transition || (i % 2 === 0 ? 'crossfade' : 'slide'),
-            effect: s.effect || 'ken-burns',
-          })),
+          scenes: moviepyScenes,
           audio: combinedPath,
           output: path.join(dir, 'renders', 'moviepy-output.mp4'),
           fps: 30,

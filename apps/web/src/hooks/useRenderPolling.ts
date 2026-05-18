@@ -1,25 +1,71 @@
 import { useEffect, useRef } from 'react';
 import { getRenderStatus } from '../utils/api';
+import { normalizeMediaList } from '../utils/mediaUrl';
 import { useProjectStore } from './useProjectStore';
+import type { DocumentaryInput } from '../utils/api';
+
+interface ProjectJson {
+  status?: string;
+  progress?: number;
+  stage?: string;
+  message?: string;
+  outputPath?: string;
+  script?: Parameters<ReturnType<typeof useProjectStore.getState>['setScript']>[0];
+  keywords?: { keywords: string[] };
+  media?: unknown[];
+  timeline?: Parameters<ReturnType<typeof useProjectStore.getState>['setTimeline']>[0];
+  input?: DocumentaryInput;
+  error?: string;
+}
 
 export function useRenderPolling(projectId: string | null, enabled: boolean) {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const { setProgress, setStatus, setOutputPath } = useProjectStore();
 
   useEffect(() => {
     if (!projectId || !enabled) return;
 
     const poll = async () => {
+      const {
+        setProgress,
+        setStatus,
+        setOutputPath,
+        setScript,
+        setKeywords,
+        setMedia,
+        setTimeline,
+        setInput,
+        setError,
+      } = useProjectStore.getState();
+
       try {
         const { data } = await getRenderStatus(projectId);
+
         setProgress(data.progress || 0, data.stage || '', data.message || '');
-        if (data.status === 'completed') {
+        if (data.script) setScript(data.script);
+        if (data.keywords) setKeywords(data.keywords);
+        if (Array.isArray(data.media)) setMedia(normalizeMediaList(data.media));
+        if (data.timeline) setTimeline(data.timeline);
+        if (data.input) setInput(data.input);
+
+        if (data.outputPath) {
+          setOutputPath(data.outputPath);
+        }
+
+        const done =
+          data.status === 'completed' ||
+          data.stage === 'done' ||
+          Boolean(data.outputPath);
+
+        if (done) {
           setStatus('completed');
-          setOutputPath(data.outputPath || null);
+          setError(null);
           clearInterval(intervalRef.current);
         } else if (data.status === 'failed') {
           setStatus('failed');
+          setError(data.error || data.message || 'Render failed');
           clearInterval(intervalRef.current);
+        } else {
+          setStatus('rendering');
         }
       } catch {
         /* backend may still be starting */
@@ -29,5 +75,5 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
     poll();
     intervalRef.current = setInterval(poll, 2000);
     return () => clearInterval(intervalRef.current);
-  }, [projectId, enabled, setProgress, setStatus, setOutputPath]);
+  }, [projectId, enabled]);
 }

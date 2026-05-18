@@ -14,9 +14,11 @@ export interface ProjectState {
   message: string;
   outputPath: string | null;
   exportOptions: ExportOptions;
-  voiceSettings: { voice: string; rate: number };
+  voiceSettings: { voice: string; rate: number; pitch: number };
+  errorMessage: string | null;
 
   setInput: (input: Partial<DocumentaryInput>) => void;
+  setError: (message: string | null) => void;
   setProjectId: (id: string | null) => void;
   setScript: (script: ProjectState['script']) => void;
   setKeywords: (kw: ProjectState['keywords']) => void;
@@ -26,7 +28,7 @@ export interface ProjectState {
   setStatus: (status: ProjectState['status']) => void;
   setOutputPath: (path: string | null) => void;
   setExportOptions: (opts: Partial<ExportOptions>) => void;
-  setVoiceSettings: (opts: Partial<{ voice: string; rate: number }>) => void;
+  setVoiceSettings: (opts: Partial<{ voice: string; rate: number; pitch: number }>) => void;
   reset: () => void;
 }
 
@@ -45,9 +47,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
   message: '',
   outputPath: null,
   exportOptions: { preset: '1080p', format: 'mp4' },
-  voiceSettings: { voice: '', rate: 175 },
+  voiceSettings: { voice: '', rate: 175, pitch: 0 },
+  errorMessage: null,
 
   setInput: (input) => set((s) => ({ input: { ...s.input, ...input } })),
+  setError: (errorMessage) => set({ errorMessage }),
   setProjectId: (id) => set({ projectId: id }),
   setScript: (script) => set({ script }),
   setKeywords: (keywords) => set({ keywords }),
@@ -73,5 +77,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
       stage: '',
       message: '',
       outputPath: null,
+      errorMessage: null,
     }),
 }));

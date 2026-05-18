@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { generateDocumentaryScript } from '../services/scriptGenerator.js';
 import { extractKeywords } from '../services/keywordExtractor.js';
-import { generateNarration } from '../services/voiceGenerator.js';
+import { generateNarration, generateVoicePreview } from '../services/voiceGenerator.js';
 import { listSystemVoices } from '../services/voiceLister.js';
+import { chatterboxHealth } from '../services/chatterboxBridge.js';
 import { writeSubtitles } from '../services/subtitleGenerator.js';
 import { buildTimeline } from '../services/timelineBuilder.js';
 import { projectDir } from '../utils/paths.js';
@@ -46,13 +47,43 @@ export function createPipelineRouter(root) {
     }
   });
 
+  router.get('/voice/health', async (_req, res) => {
+    try {
+      res.json(await chatterboxHealth());
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/voice/preview', async (req, res) => {
+    try {
+      const { voice, rate, pitch, text } = req.body;
+      const cacheDir = path.join(root, 'cache', 'voice-preview');
+      fs.mkdirSync(cacheDir, { recursive: true });
+      const filename = `preview-${Date.now()}.mp3`;
+      const outputPath = path.join(cacheDir, filename);
+      const result = await generateVoicePreview(outputPath, { voice, rate, pitch, text });
+      res.json({
+        url: `/cache/voice-preview/${filename}`,
+        path: result.path,
+        voice: result.voice,
+        rate: result.rate,
+        pitch: result.pitch,
+        provider: 'chatterbox',
+      });
+    } catch (err) {
+      console.error('[TTS] Preview failed:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.post('/narration', async (req, res) => {
     try {
-      const { sections, projectId, voice, rate } = req.body;
+      const { sections, projectId, voice, rate, pitch } = req.body;
       const dir = projectId
         ? path.join(projectDir(root, projectId), 'audio')
         : path.join(root, 'cache', 'tts-temp');
-      const result = await generateNarration(sections, dir, { voice, rate });
+      const result = await generateNarration(sections, dir, { voice, rate, pitch });
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });

@@ -5,6 +5,7 @@ Usage: python3 moviepy_renderer.py --config /path/to/config.json
 """
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -44,6 +45,7 @@ RESOLUTIONS = {
 }
 
 CROSSFADE_SEC = 0.55
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
 
 
 def apply_fades(clip, duration=0.5):
@@ -78,34 +80,95 @@ def apply_slide_offset(clip, transition):
     )
 
 
+def ffprobe_has_video(path: str) -> bool:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_type",
+                "-of",
+                "csv=p=0",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        return result.returncode == 0 and result.stdout.strip() == "video"
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def file_too_small(path: Path, min_bytes: int = 48000) -> bool:
+    try:
+        return path.stat().st_size < min_bytes
+    except OSError:
+        return True
+
+
+def looks_like_image(path: Path) -> bool:
+    return path.suffix.lower() in IMAGE_EXT
+
+
+def build_image_clip(path: Path, duration: float, size, effect: str, transition: str):
+    clip = ImageClip(str(path), duration=duration)
+    clip = resize_clip(clip, size)
+    if effect == "ken-burns":
+        clip = ken_burns(clip)
+    clip = apply_slide_offset(clip, transition)
+    fade_dur = 0.65 if transition in ("crossfade", "fade") else 0.45
+    return apply_fades(clip, fade_dur)
+
+
 def build_scene(scene, size):
-    path = scene.get("path")
+    raw_path = scene.get("path")
+    if not raw_path:
+        return None
+
+    path = Path(raw_path)
+    if not path.exists() or file_too_small(path):
+        print(f"WARN: skip missing/tiny asset {raw_path}", file=sys.stderr)
+        return None
+
     duration = float(scene.get("duration", 5))
     media_type = scene.get("type", "image")
     transition = scene.get("transition", "crossfade")
     effect = scene.get("effect", "ken-burns")
 
-    if not path or not Path(path).exists():
+    use_video = media_type == "video" and not looks_like_image(path)
+
+    if use_video:
+        if not ffprobe_has_video(str(path)):
+            print(f"WARN: invalid video, trying as image {path}", file=sys.stderr)
+            use_video = False
+
+    if use_video:
+        try:
+            clip = VideoFileClip(str(path))
+            end = min(duration, clip.duration or duration)
+            if MOVIEPY_V2:
+                clip = clip.subclipped(0, end)
+            else:
+                clip = clip.subclip(0, end)
+            clip = resize_clip(clip, size)
+            clip = apply_slide_offset(clip, transition)
+            fade_dur = 0.65 if transition in ("crossfade", "fade") else 0.45
+            return apply_fades(clip, fade_dur)
+        except Exception as exc:
+            print(f"WARN: VideoFileClip failed for {path}: {exc}", file=sys.stderr)
+            use_video = False
+
+    try:
+        return build_image_clip(path, duration, size, effect, transition)
+    except Exception as exc:
+        print(f"WARN: skip unreadable asset {path}: {exc}", file=sys.stderr)
         return None
-
-    if media_type == "video":
-        clip = VideoFileClip(path)
-        end = min(duration, clip.duration)
-        if MOVIEPY_V2:
-            clip = clip.subclipped(0, end)
-        else:
-            clip = clip.subclip(0, end)
-        clip = resize_clip(clip, size)
-    else:
-        clip = ImageClip(path, duration=duration)
-        clip = resize_clip(clip, size)
-        if effect == "ken-burns":
-            clip = ken_burns(clip)
-
-    clip = apply_slide_offset(clip, transition)
-    fade_dur = 0.65 if transition in ("crossfade", "fade") else 0.45
-    clip = apply_fades(clip, fade_dur)
-    return clip
 
 
 def concatenate_with_crossfade(clips):
@@ -120,7 +183,6 @@ def concatenate_with_crossfade(clips):
             out = concatenate_videoclips([out, nxt], method="compose", padding=-CROSSFADE_SEC)
         return out
 
-    # MoviePy 2: overlap via CompositeVideoClip
     positioned = []
     t = 0
     for i, clip in enumerate(clips):

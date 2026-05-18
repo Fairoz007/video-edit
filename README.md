@@ -12,11 +12,27 @@ Automatic documentary video generator — **no AI APIs** for scripting. Uses rul
 | NLP | compromise.js, keyword-extractor |
 | Media | Pexels, Pixabay, Unsplash APIs |
 
+## Monorepo layout
+
+```
+├── apps/
+│   ├── web/           # Vite + React UI
+│   ├── api/           # Express backend, TTS, scrapers, pipelines
+│   └── desktop/       # Electron shell
+├── packages/
+│   ├── remotion/      # Remotion compositions
+│   └── config/        # Shared monorepo utilities
+├── projects/          # Per-project assets
+├── cache/             # Downloaded media
+├── exports/           # Final MP4/MOV
+└── scripts/           # Dev & maintenance scripts
+```
+
 ## Prerequisites
 
 - **Node.js** 18+
 - **FFmpeg** on PATH (`brew install ffmpeg`)
-- **Python 3** + MoviePy (`pip install -r backend/moviepy/requirements.txt`)
+- **Python 3** + MoviePy (`pip install -r apps/api/moviepy/requirements.txt`)
 - API keys in `.env` (copy from `.env.example`)
 
 ## Quick start
@@ -26,13 +42,13 @@ cp .env.example .env
 # Add PEXELS_API_KEY, PIXABAY_API_KEY, UNSPLASH_ACCESS_KEY
 
 npm install
-python3 -m pip install -r backend/moviepy/requirements.txt
+python3 -m pip install -r apps/api/moviepy/requirements.txt
 
-# Terminal 1 — backend
-npm run dev:backend
-
-# Terminal 2 — app (Electron + Vite)
+# Full stack (API + Vite + Electron)
 npm run dev
+
+# Web only (API + Vite, no Electron)
+npm run dev:web
 ```
 
 If you see **port already in use**, run:
@@ -43,22 +59,16 @@ npm run kill:ports
 
 Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same line as commands.
 
-## Project layout
+## Workspace scripts
 
-```
-├── electron/          # Main process + preload
-├── src/               # React UI
-├── backend/
-│   ├── server.js
-│   ├── services/      # mediaSearch, scriptGenerator, videoRenderer, etc.
-│   ├── routes/
-│   ├── moviepy/       # Python sequencing
-│   └── scraper/
-├── remotion/          # React video compositions
-├── projects/          # Per-project assets
-├── cache/             # Downloaded media
-└── exports/           # Final MP4/MOV
-```
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | API + web + Electron |
+| `npm run dev:web` | API + web |
+| `npm run dev -w @docuforge/api` | Backend only |
+| `npm run dev -w @docuforge/web` | Vite only |
+| `npm run remotion:studio` | Remotion Studio |
+| `npm run clean:workspace` | Clear projects/cache/exports |
 
 ## Pipeline
 
@@ -77,8 +87,4 @@ Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same l
 
 ## Future AI (disabled)
 
-See `backend/services/aiPlaceholder.js` for OpenAI, Ollama, Whisper, ElevenLabs hooks.
-
-## License
-
-MIT
+See `apps/api/services/aiPlaceholder.js` for OpenAI, Ollama, Whisper, ElevenLabs hooks.
