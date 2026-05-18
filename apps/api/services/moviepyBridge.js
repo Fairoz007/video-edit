@@ -4,13 +4,14 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolvePython } from '../utils/resolvePython.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '../moviepy/moviepy_renderer.py');
 
 export function runMoviePyPipeline(configPath, onProgress) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('python3', [SCRIPT, '--config', configPath], {
+    const proc = spawn(resolvePython(), [SCRIPT, '--config', configPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

@@ -4,6 +4,7 @@ import { extractKeywords } from '../services/keywordExtractor.js';
 import { generateNarration, generateVoicePreview } from '../services/voiceGenerator.js';
 import { listSystemVoices } from '../services/voiceLister.js';
 import { chatterboxHealth } from '../services/chatterboxBridge.js';
+import { elevenLabsHealth } from '../services/elevenlabsBridge.js';
 import {
   getCachedPreset,
   getPreviewCacheStatus,
@@ -72,7 +73,11 @@ export function createPipelineRouter(root) {
 
   router.get('/voice/health', async (_req, res) => {
     try {
-      res.json(await chatterboxHealth());
+      const [chatterbox, elevenlabs] = await Promise.all([
+        chatterboxHealth(),
+        elevenLabsHealth(),
+      ]);
+      res.json({ chatterbox, elevenlabs });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -98,7 +103,8 @@ export function createPipelineRouter(root) {
         rate: result.rate,
         pitch: result.pitch,
         cached: false,
-        provider: 'chatterbox',
+        provider: result.provider || 'chatterbox',
+        model: result.model,
       });
     } catch (err) {
       console.error('[TTS] Preview failed:', err);

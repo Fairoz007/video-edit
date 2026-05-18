@@ -7,6 +7,19 @@ import os from 'os';
 import path from 'path';
 import { findFfmpegPath } from '../utils/ffmpegPath.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { getMediaDurationSec } from '../utils/audioDuration.js';
+import { extendVideoToDuration } from '../utils/videoPad.js';
+
+/** rename fails across drives on Windows (EXDEV); copy+unlink instead. */
+function moveFileSync(src, dest) {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err) {
+    if (err?.code !== 'EXDEV') throw err;
+    fs.copyFileSync(src, dest);
+    fs.unlinkSync(src);
+  }
+}
 
 const RESOLUTIONS = {
   '1080p': { w: 1920, h: 1080 },
@@ -94,7 +107,7 @@ export async function exportVideoOnly({
       .on('end', async () => {
         try {
           if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-          fs.renameSync(tempPath, outputPath);
+          moveFileSync(tempPath, outputPath);
           const ok = await verifyVideoFile(outputPath);
           if (!ok) {
             reject(new Error('Export failed validation (incomplete or corrupt MP4)'));
@@ -127,6 +140,11 @@ export async function exportDocumentary({
     return exportVideoOnly({ videoPath, outputPath, preset, cinematic });
   }
   if (!fs.existsSync(narrationPath)) throw new Error(`Narration not found: ${narrationPath}`);
+
+  const narrationSec = await getMediaDurationSec(narrationPath);
+  if (narrationSec && narrationSec > 1) {
+    videoPath = await extendVideoToDuration(videoPath, narrationSec);
+  }
 
   const { w, h } = RESOLUTIONS[preset] || RESOLUTIONS['1080p'];
   // FFmpeg needs a .mp4 extension (or explicit -f mp4) — ".mp4.part" breaks format detection.
@@ -188,7 +206,7 @@ export async function exportDocumentary({
       .on('end', async () => {
         try {
           if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-          fs.renameSync(tempPath, outputPath);
+          moveFileSync(tempPath, outputPath);
           const ok = await verifyVideoFile(outputPath);
           if (!ok) {
             reject(new Error('Export failed validation (incomplete or corrupt MP4)'));

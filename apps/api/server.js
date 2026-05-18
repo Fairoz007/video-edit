@@ -1,11 +1,11 @@
 /**
  * DocuForge Express API — orchestrates media, script, TTS, and rendering pipelines.
  */
+import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 
 import { createProjectRouter } from './routes/projects.js';
 import { createPipelineRouter } from './routes/pipeline.js';
@@ -16,11 +16,28 @@ import { createScrapeRouter } from './routes/scrape.js';
 import { createExportsRouter } from './routes/exports.js';
 import { initFfmpeg } from './utils/ffmpegPath.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
-import { warmVoicePreviews } from './services/voicePreviewCache.js';
+import { resolvePython } from './utils/resolvePython.js';
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
 
-dotenv.config({ path: path.join(ROOT, '.env') });
+function resolveScriptProviderLabel() {
+  const mode = (process.env.SCRIPT_PROVIDER || 'auto').toLowerCase();
+  const gemini = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const groq = Boolean(process.env.GROQ_API_KEY?.trim());
+  if (mode === 'gemini' && gemini) {
+    return `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})`;
+  }
+  if (mode === 'groq' && groq) {
+    return `Groq (${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'})`;
+  }
+  if (gemini && mode === 'auto') {
+    return `auto → Groq then Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})`;
+  }
+  if (groq) return `Groq (${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'})`;
+  if (gemini) return `Gemini (${process.env.GEMINI_MODEL || 'gemini-flash-latest'})`;
+  return 'rule-based fallback';
+}
+
 initFfmpeg();
 
 const app = express();
@@ -53,6 +70,7 @@ app.use('/api/exports', createExportsRouter(ROOT));
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   const providers = [
+    process.env.GEMINI_API_KEY && 'Gemini (script)',
     process.env.GROQ_API_KEY && 'Groq (script)',
     process.env.UNSPLASH_ACCESS_KEY && 'Unsplash',
     process.env.PEXELS_API_KEY && 'Pexels',
@@ -61,12 +79,18 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[DocuForge] Backend running on http://localhost:${PORT}`);
   console.log(`[DocuForge] Media APIs: ${providers.length ? providers.join(', ') : 'none configured'}`);
   console.log(
-    `[DocuForge] Script: ${process.env.GROQ_API_KEY ? `Groq (${process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'})` : 'rule-based fallback'}`,
+    `[DocuForge] Script: ${resolveScriptProviderLabel()}`,
   );
-  console.log(
-    `[DocuForge] TTS: Chatterbox-Turbo + Multilingual v3 (python: ${process.env.CHATTERBOX_PYTHON || 'python3.11'})`,
-  );
-  warmVoicePreviews(ROOT);
+  const ttsProvider = process.env.TTS_PROVIDER || (process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : 'chatterbox');
+  if (ttsProvider === 'elevenlabs' || (ttsProvider === 'auto' && process.env.ELEVENLABS_API_KEY)) {
+    console.log(
+      `[DocuForge] TTS: ElevenLabs (${process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2'})`,
+    );
+  } else {
+    console.log(
+      `[DocuForge] TTS: Chatterbox (python: ${resolvePython()})`,
+    );
+  }
 });
 
 server.on('error', (err) => {

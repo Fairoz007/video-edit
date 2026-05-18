@@ -54,8 +54,10 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   const sectionCount = Math.max(1, script.sections.length);
   const audioDurationSec = videoOnly ? null : options.audioDurationSec;
 
-  const contentTarget =
-    audioDurationSec && audioDurationSec > 30 ? audioDurationSec : CONTENT_DURATION;
+  const contentTarget = Math.max(
+    CONTENT_DURATION,
+    audioDurationSec && audioDurationSec > 30 ? audioDurationSec : 0,
+  );
 
   const minClips = Math.max(sectionCount * 2, 12);
   const pool = expandMediaPool(mediaManifest, minClips);
@@ -126,7 +128,20 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     }
   }
 
-  const contentEnd = Math.max(0, timeCursor - REMOTION_INTRO_GRAPHIC_SEC);
+  let contentEnd = Math.max(0, timeCursor - REMOTION_INTRO_GRAPHIC_SEC);
+  if (contentEnd < contentTarget * 0.95 && scenes.length > 0) {
+    const stretch = contentTarget / Math.max(contentEnd, 1);
+    for (const scene of scenes) {
+      scene.duration = Math.max(2.5, scene.duration * stretch);
+    }
+    timeCursor = REMOTION_INTRO_GRAPHIC_SEC;
+    for (const scene of scenes) {
+      scene.start = timeCursor;
+      timeCursor += scene.duration;
+    }
+    contentEnd = contentTarget;
+  }
+
   const totalDuration =
     REMOTION_INTRO_GRAPHIC_SEC + contentEnd + REMOTION_OUTRO_GRAPHIC_SEC;
 

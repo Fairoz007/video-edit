@@ -9,6 +9,7 @@ JSON line protocol on stdin/stdout when run with --serve.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import sys
@@ -86,6 +87,22 @@ def ref_path_for_voice(voice: dict) -> str | None:
     return None
 
 
+def _ensure_perth_watermarker() -> None:
+    """Perth can fail to import on first load; repair before ChatterboxTurboTTS.__init__."""
+    import perth
+
+    if perth.PerthImplicitWatermarker is not None:
+        return
+    try:
+        from perth.perth_net.perth_net_implicit.perth_watermarker import PerthImplicitWatermarker
+
+        perth.PerthImplicitWatermarker = PerthImplicitWatermarker
+    except ImportError as err:
+        raise RuntimeError(
+            "Perth watermark library failed to load. Run: npm run setup"
+        ) from err
+
+
 def get_shared_engine() -> "ChatterboxEngine":
     global _ENGINE
     with _ENGINE_LOCK:
@@ -109,6 +126,7 @@ class ChatterboxEngine:
 
     def get_turbo(self):
         if self._turbo is None:
+            _ensure_perth_watermarker()
             from chatterbox.tts_turbo import ChatterboxTurboTTS
 
             log("[Chatterbox] Loading Chatterbox-Turbo…")
@@ -121,11 +139,22 @@ class ChatterboxEngine:
         if self._mtl is None:
             from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
+            params = inspect.signature(ChatterboxMultilingualTTS.from_pretrained).parameters
+            supports_t3 = "t3_model" in params
+
             log(f"[Chatterbox] Loading Multilingual T3 ({t3})…")
-            self._mtl = ChatterboxMultilingualTTS.from_pretrained(
-                device=self.device,
-                t3_model=t3,
-            )
+            if supports_t3:
+                self._mtl = ChatterboxMultilingualTTS.from_pretrained(
+                    device=self.device,
+                    t3_model=t3,
+                )
+            else:
+                if t3 and t3 not in ("v2", "t3_mtl23ls_v2"):
+                    log(
+                        "[Chatterbox] Installed chatterbox-tts has no t3_model support; "
+                        "using v2. Run: npm run setup"
+                    )
+                self._mtl = ChatterboxMultilingualTTS.from_pretrained(device=self.device)
             log("[Chatterbox] Multilingual ready")
         return self._mtl
 

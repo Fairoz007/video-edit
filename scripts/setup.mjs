@@ -49,12 +49,8 @@ function run(cmd, args, opts = {}) {
 }
 
 function commandExists(bin) {
-  try {
-    execSync(`command -v ${bin}`, { stdio: 'ignore', shell: true });
-    return true;
-  } catch {
-    return false;
-  }
+  const r = spawnSync(bin, ['--version'], { stdio: 'ignore', shell: true });
+  return r.status === 0;
 }
 
 function loadEnvFile() {
@@ -77,14 +73,37 @@ function loadEnvFile() {
   }
 }
 
+function resolvePyLauncherExecutable(version) {
+  const r = spawnSync('py', [`-${version}`, '-c', 'import sys; print(sys.executable)'], {
+    encoding: 'utf8',
+  });
+  return r.status === 0 ? (r.stdout || '').trim() : null;
+}
+
 function resolvePython() {
   const fromEnv = process.env.CHATTERBOX_PYTHON || process.env.PYTHON_FOR_CHATTERBOX;
-  const candidates = [fromEnv, 'python3.11', 'python3.12', 'python3', 'python'].filter(Boolean);
+
+  if (fromEnv && /^3\.\d{1,2}$/.test(fromEnv)) {
+    const exe = resolvePyLauncherExecutable(fromEnv);
+    if (exe) return exe;
+  }
+
+  const candidates = [fromEnv, 'python3.13', 'python3.12', 'python3', 'python'].filter(Boolean);
+
   for (const bin of candidates) {
+    if (!bin || /^3\.\d{1,2}$/.test(bin)) continue;
     if (!commandExists(bin)) continue;
-    const r = spawnSync(bin, ['--version'], { encoding: 'utf8' });
+    const r = spawnSync(bin, ['--version'], { encoding: 'utf8', shell: true });
     if (r.status === 0) return bin;
   }
+
+  if (commandExists('py')) {
+    for (const ver of ['3.13', '3.12']) {
+      const exe = resolvePyLauncherExecutable(ver);
+      if (exe) return exe;
+    }
+  }
+
   return null;
 }
 
@@ -136,6 +155,26 @@ function pipInstall(python) {
       throw new Error(`pip install failed for ${req}`);
     }
   }
+  pipInstallCudaTorch(python);
+}
+
+/** NVIDIA on Windows: replace CPU-only torch with CUDA build for Chatterbox GPU inference. */
+function pipInstallCudaTorch(python) {
+  if (process.platform !== 'win32' || !commandExists('nvidia-smi')) return;
+  log('pip', 'NVIDIA GPU detected — installing PyTorch with CUDA 12.4…');
+  const ok = run(python, [
+    '-m',
+    'pip',
+    'install',
+    '--force-reinstall',
+    'torch==2.6.0',
+    'torchaudio==2.6.0',
+    '--index-url',
+    'https://download.pytorch.org/whl/cu124',
+  ]);
+  if (!ok) {
+    warn('CUDA PyTorch install failed — TTS will fall back to CPU. See https://pytorch.org');
+  }
 }
 
 function downloadChatterboxModels(python) {
@@ -160,8 +199,14 @@ function downloadChatterboxModels(python) {
   }
 
   let result;
+  const stdout = (r.stdout || '').trim();
+  const jsonLine = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('{'))
+    .pop();
   try {
-    result = JSON.parse((r.stdout || '').trim());
+    result = JSON.parse(jsonLine || stdout);
   } catch {
     throw new Error('Chatterbox setup did not return JSON');
   }

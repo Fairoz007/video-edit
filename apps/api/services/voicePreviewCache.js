@@ -13,12 +13,39 @@ const DEFAULT_PITCH = 0;
 
 const warmingState = {
   warming: false,
-  complete: false,
+  complete: true,
 };
 
+function isPreviewWarmEnabled() {
+  const v = (process.env.VOICE_PREVIEW_WARM || '0').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function readVoiceCatalog() {
+  return JSON.parse(fs.readFileSync(VOICES_JSON, 'utf8'));
+}
+
+/** Which engines to prefetch on startup (comma-separated: turbo, multilingual). Default: turbo only. */
+function voiceIdsForWarmup() {
+  const catalog = readVoiceCatalog();
+  const engines = (process.env.VOICE_PREVIEW_WARM_ENGINES || 'turbo')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const allowAll = engines.includes('all') || engines.includes('*');
+
+  return (catalog.voices || [])
+    .filter((v) => {
+      if (!v.id) return false;
+      if (allowAll) return true;
+      const engine = (v.engine || 'turbo').toLowerCase();
+      return engines.includes(engine);
+    })
+    .map((v) => v.id);
+}
+
 function readVoiceIds() {
-  const catalog = JSON.parse(fs.readFileSync(VOICES_JSON, 'utf8'));
-  return (catalog.voices || []).map((v) => v.id).filter(Boolean);
+  return (readVoiceCatalog().voices || []).map((v) => v.id).filter(Boolean);
 }
 
 function presetsDir(root) {
@@ -53,6 +80,10 @@ export function getCachedPreset(root, voice, rate = DEFAULT_RATE, pitch = DEFAUL
 }
 
 export function getPreviewCacheStatus(root) {
+  if (!isPreviewWarmEnabled()) {
+    return { warming: false, complete: true, ready: 0, total: 0, missing: [] };
+  }
+
   const ids = readVoiceIds();
   const total = ids.length;
   let ready = 0;
@@ -82,10 +113,11 @@ export function getPreviewCacheStatus(root) {
 export function attachPreviewUrls(root, catalog) {
   const voices = (catalog.voices || []).map((voice) => {
     const cached = getCachedPreset(root, voice.id);
+    const previewUrl = cached?.url || voice.previewUrl;
     return {
       ...voice,
-      previewUrl: cached?.url,
-      previewReady: Boolean(cached),
+      previewUrl,
+      previewReady: Boolean(previewUrl),
     };
   });
 
@@ -97,9 +129,21 @@ export function attachPreviewUrls(root, catalog) {
 }
 
 export function warmVoicePreviews(root) {
+  if (!isPreviewWarmEnabled()) {
+    warmingState.warming = false;
+    warmingState.complete = true;
+    return;
+  }
+
   if (!root || warmingState.warming) return;
 
-  const ids = readVoiceIds();
+  const tts = (process.env.TTS_PROVIDER || 'auto').toLowerCase();
+  if (tts === 'elevenlabs') {
+    warmingState.complete = true;
+    return;
+  }
+
+  const ids = voiceIdsForWarmup();
   if (!ids.length) {
     warmingState.complete = true;
     return;
@@ -108,6 +152,11 @@ export function warmVoicePreviews(root) {
   fs.mkdirSync(presetsDir(root), { recursive: true });
 
   const pending = ids.filter((id) => !fs.existsSync(presetPath(root, id)));
+  if (pending.length) {
+    console.log(
+      `[VoicePreview] Warming ${pending.length} voice(s) (${process.env.VOICE_PREVIEW_WARM_ENGINES || 'turbo'} only)…`,
+    );
+  }
   if (!pending.length) {
     warmingState.complete = true;
     warmingState.warming = false;

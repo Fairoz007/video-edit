@@ -10,7 +10,10 @@ import { searchMedia, downloadMediaAssets } from './mediaSearch.js';
 import { scrapeUrlForVideo } from '../scraper/playwrightScraper.js';
 import { generateDocumentaryScript } from './scriptGenerator.js';
 import { generateNarrationForTargetDuration } from './voiceGenerator.js';
-import { REMOTION_INTRO_GRAPHIC_SEC } from '../constants/videoDefaults.js';
+import {
+  REMOTION_INTRO_GRAPHIC_SEC,
+  TARGET_VIDEO_DURATION_SEC,
+} from '../constants/videoDefaults.js';
 import { writeSubtitles } from './subtitleGenerator.js';
 import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
@@ -26,6 +29,8 @@ import {
 } from '@docuforge/config/documentaryTemplates';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValidate.js';
+import { ensureMediaManifest } from '../utils/placeholderMedia.js';
+import { expandScriptSections } from './scriptLength.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
 
 export class RenderPipeline {
@@ -47,10 +52,26 @@ export class RenderPipeline {
     return project;
   }
 
+  loadOrCreateProject(projectId, input = {}) {
+    const dir = projectDir(this.root, projectId);
+    const projectPath = path.join(dir, 'project.json');
+    if (fs.existsSync(projectPath)) {
+      return JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    }
+    const project = {
+      id: projectId,
+      input: input && typeof input === 'object' ? { ...input } : {},
+      status: 'created',
+      createdAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    return project;
+  }
+
   mergeProjectInput(projectId, input) {
     if (!input || typeof input !== 'object') return null;
     const projectPath = path.join(projectDir(this.root, projectId), 'project.json');
-    const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    const project = this.loadOrCreateProject(projectId);
     project.input = { ...(project.input || {}), ...input };
     fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
     return project;
@@ -59,7 +80,7 @@ export class RenderPipeline {
   async runFullPipeline(projectId, options = {}, onProgress) {
     const dir = projectDir(this.root, projectId);
     const projectPath = path.join(dir, 'project.json');
-    let project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    let project = this.loadOrCreateProject(projectId, options.input);
 
     if (options.input && typeof options.input === 'object') {
       project.input = { ...(project.input || {}), ...options.input };
@@ -88,7 +109,7 @@ export class RenderPipeline {
     try {
       // 1. Script
       report('script', 5, 'Generating documentary script...');
-      const script = await generateDocumentaryScript(project.input);
+      let script = await generateDocumentaryScript(project.input);
       project.script = script;
       fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
 
@@ -106,6 +127,12 @@ export class RenderPipeline {
         project.scrapedContent = scrapedContent;
         scrapedMedia = scraped.media || [];
       }
+
+      const researchForScript = [scrapedContent?.text, script.fullNarration].filter(Boolean).join('\n\n');
+      script.sections = expandScriptSections(script.sections, researchForScript);
+      script.fullNarration = script.sections.map((s) => s.narration).join('\n\n');
+      project.script = script;
+      fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
 
       // 3. Keywords (Playwright page text + script)
       report('keywords', 18, 'Extracting keywords with Playwright...');
@@ -136,6 +163,7 @@ export class RenderPipeline {
         return Boolean(m.localPath || m.url);
       });
       const mediaDir = path.join(dir, 'media');
+      fs.mkdirSync(mediaDir, { recursive: true });
       const stockManifest = await downloadMediaAssets(
         allMedia.filter((m) => !m.localPath),
         mediaDir,
@@ -144,7 +172,9 @@ export class RenderPipeline {
         ...scrapedMedia.filter((m) => m.localPath),
         ...stockManifest,
       ];
-      project.media = await sanitizeMediaManifest(manifest);
+      let media = await sanitizeMediaManifest(manifest);
+      media = await ensureMediaManifest(media, mediaDir, 12);
+      project.media = media;
       if (project.media.length < manifest.length) {
         console.warn(
           `[Pipeline] Dropped ${manifest.length - project.media.length} invalid media file(s)`,
@@ -154,6 +184,7 @@ export class RenderPipeline {
       let tracks = [];
       let combinedPath = null;
       let audioDurationSec = null;
+      let effectiveNarrationSec = TARGET_VIDEO_DURATION_SEC;
 
       // 4. Narration (~3:00 target) — skipped in video-only edit mode
       if (videoOnly) {
@@ -171,9 +202,13 @@ export class RenderPipeline {
           },
         );
         ({ tracks, combinedPath, durationSec: audioDurationSec } = narrationResult);
-        project.narration = { tracks, combinedPath, audioDurationSec };
+        effectiveNarrationSec =
+          audioDurationSec && audioDurationSec > 30
+            ? audioDurationSec
+            : TARGET_VIDEO_DURATION_SEC;
+        project.narration = { tracks, combinedPath, audioDurationSec: effectiveNarrationSec };
 
-        script.sections = syncSectionDurationsFromAudio(script.sections, audioDurationSec);
+        script.sections = syncSectionDurationsFromAudio(script.sections, effectiveNarrationSec);
         script.sections = balanceSectionDurations(script.sections);
         project.script = script;
         fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
@@ -187,7 +222,7 @@ export class RenderPipeline {
         report('subtitles', 45, 'Creating animated subtitle cues...');
         const { cues, wordCues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
           introOffsetSec: REMOTION_INTRO_GRAPHIC_SEC,
-          audioDurationSec,
+          audioDurationSec: effectiveNarrationSec,
         });
         project.subtitleCues = cues;
         project.wordCues = wordCues;
@@ -201,7 +236,9 @@ export class RenderPipeline {
       let timeline;
       let walkthrough;
       if (videoStyle === 'walkthrough') {
-        walkthrough = buildWalkthroughTimeline(script, manifest, { audioDurationSec });
+        walkthrough = buildWalkthroughTimeline(script, media, {
+          audioDurationSec: effectiveNarrationSec,
+        });
         project.walkthrough = walkthrough;
         timeline = {
           scenes: walkthrough.screens.map((s) => ({
@@ -216,8 +253,8 @@ export class RenderPipeline {
         const docTemplate = getDocumentaryTemplate(project.input?.templateId);
         const visualTheme = resolveVisualTheme(docTemplate);
         project.visualTemplate = docTemplate;
-        timeline = buildTimeline(script, manifest, tracks, {
-          audioDurationSec,
+        timeline = buildTimeline(script, media, tracks, {
+          audioDurationSec: effectiveNarrationSec,
           videoOnly,
           editMode: project.input?.editMode,
           templateId: docTemplate.id,

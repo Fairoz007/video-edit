@@ -1,5 +1,5 @@
 /**
- * Narration via Resemble AI Chatterbox-TTS (Turbo + Multilingual v3).
+ * Narration — ElevenLabs (cloud) or Chatterbox-TTS (local).
  */
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -8,13 +8,26 @@ import path from 'path';
 import { findFfmpegPath, hasFfmpeg } from '../utils/ffmpegPath.js';
 import { getMediaDurationSec } from '../utils/audioDuration.js';
 import { TARGET_VIDEO_DURATION_SEC } from '../constants/videoDefaults.js';
-import { listSystemVoices, pickVoice } from './voiceLister.js';
+import {
+  listSystemVoices,
+  pickVoice,
+  getVoiceMeta,
+  isElevenLabsVoice,
+} from './voiceLister.js';
 import { synthesizeChatterbox } from './chatterboxBridge.js';
+import { synthesizeElevenLabs, isElevenLabsEnabled } from './elevenlabsBridge.js';
 
 const execFileAsync = promisify(execFile);
 
 const PREVIEW_SAMPLE =
-  'Hello, I am your documentary narrator. [chuckle] Chatterbox-Turbo is ready.';
+  'Hello, I am your documentary narrator. This is a preview of your selected voice.';
+
+function shouldFallbackToChatterbox(err, providerMode) {
+  const status = err.status ?? err.response?.status ?? err.cause?.response?.status;
+  if (status !== 402 && status !== 429 && status !== 401) return false;
+  if (providerMode === 'auto') return true;
+  return process.env.ELEVENLABS_FALLBACK_CHATTERBOX === '1';
+}
 
 function resolveVoiceOptions(options = {}) {
   const voice = options.voice || process.env.TTS_VOICE || 'chatterbox-turbo';
@@ -100,15 +113,82 @@ async function postProcessSpeech(inputPath, outputPath, { rate = 175, pitch = 0 
 }
 
 async function synthesizeToMp3(text, outputPath, options = {}) {
-  const { voice, rate, pitch } = resolveVoiceOptions(options);
+  const { rate, pitch } = resolveVoiceOptions(options);
   const mp3Path = path.resolve(outputPath);
-  const wavPath = mp3Path.replace(/\.mp3$/i, '.wav');
   fs.mkdirSync(path.dirname(mp3Path), { recursive: true });
 
+  const catalog = options.voiceCatalog || (await listSystemVoices());
+  const voices = catalog.voices || [];
+  const providerMode = (process.env.TTS_PROVIDER || 'auto').toLowerCase();
+  let voice = resolveVoiceOptions(options).voice;
+  if (
+    isElevenLabsEnabled() &&
+    providerMode !== 'chatterbox' &&
+    (providerMode === 'elevenlabs' || isElevenLabsVoice(voice, voices))
+  ) {
+    voice = pickVoice(voices, voice || catalog.defaultVoice);
+  }
+
+  const useElevenLabs =
+    isElevenLabsEnabled() &&
+    providerMode !== 'chatterbox' &&
+    (providerMode === 'elevenlabs' || isElevenLabsVoice(voice, voices));
+
+  if (useElevenLabs) {
+    try {
+      const rawMp3 = mp3Path.replace(/\.mp3$/i, '-el-raw.mp3');
+      const result = await synthesizeElevenLabs({
+        text,
+        outputPath: rawMp3,
+        voiceId: voice,
+        rate,
+      });
+
+      let finalPath = result.path;
+      if (pitch !== 0) {
+        const pitched = rawMp3.replace(/\.mp3$/i, '-pitch.mp3');
+        finalPath = await postProcessSpeech(rawMp3, pitched, { rate: 175, pitch });
+        if (finalPath !== mp3Path && fs.existsSync(rawMp3)) {
+          try {
+            fs.unlinkSync(rawMp3);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (path.resolve(finalPath) !== path.resolve(mp3Path)) {
+        fs.copyFileSync(finalPath, mp3Path);
+        if (finalPath !== rawMp3 && fs.existsSync(finalPath)) {
+          try {
+            fs.unlinkSync(finalPath);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      return {
+        path: mp3Path,
+        voice: result.voiceId || voice,
+        rate,
+        pitch,
+        provider: 'elevenlabs',
+        model: result.model,
+      };
+    } catch (err) {
+      if (!shouldFallbackToChatterbox(err, providerMode)) throw err;
+      console.warn('[TTS] ElevenLabs unavailable, using Chatterbox:', err.message);
+      voice = pickVoice(voices, 'chatterbox-turbo');
+    }
+  }
+
+  const wavPath = mp3Path.replace(/\.mp3$/i, '.wav');
   const synthResult = await synthesizeChatterbox({
     text,
     outputWav: wavPath,
     voice,
+    forceOneshot: options.forceOneshot,
   });
   const synthWav = synthResult?.path ? path.resolve(synthResult.path) : wavPath;
   if (!fs.existsSync(synthWav)) {
@@ -130,27 +210,32 @@ async function synthesizeToMp3(text, outputPath, options = {}) {
     }
   }
 
-  return { path: finalMp3, voice, rate, pitch };
+  return { path: finalMp3, voice, rate, pitch, provider: 'chatterbox' };
 }
 
 export async function generateVoicePreview(outputPath, options = {}) {
   const text = options.text || PREVIEW_SAMPLE;
-  return synthesizeToMp3(text, outputPath, options);
+  return synthesizeToMp3(text, outputPath, {
+    ...options,
+    forceOneshot: options.forceOneshot ?? process.env.VOICE_PREVIEW_ONESHOT === '1',
+  });
 }
 
 export async function generateNarration(sections, outputDir, options = {}) {
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const { voices, defaultVoice } = await listSystemVoices();
+  const catalog = await listSystemVoices();
+  const { voices, defaultVoice } = catalog;
   const { voice: requestedVoice, rate, pitch } = resolveVoiceOptions(options);
   const voice = pickVoice(voices, requestedVoice || defaultVoice);
 
   const fullText = sections.map((s) => s.narration).filter(Boolean).join('\n\n');
   const combinedBase = path.join(outputDir, 'narration-full.mp3');
-  const { path: combinedPath } = await synthesizeToMp3(fullText, combinedBase, {
+  const { path: combinedPath, provider, model } = await synthesizeToMp3(fullText, combinedBase, {
     voice,
     rate,
     pitch,
+    voiceCatalog: catalog,
   });
 
   const tracks = sections.map((section) => ({
@@ -165,7 +250,8 @@ export async function generateNarration(sections, outputDir, options = {}) {
     voice,
     rate,
     pitch,
-    provider: 'chatterbox',
+    provider: provider || 'chatterbox',
+    model,
     format: path.extname(combinedPath).slice(1),
     ffmpegAvailable: hasFfmpeg(),
   };
@@ -180,66 +266,36 @@ export async function generateNarrationForTargetDuration(sections, outputDir, op
   let result = await generateNarration(sections, outputDir, { ...options, rate });
   let durationSec = await getMediaDurationSec(result.combinedPath);
 
-  for (let attempt = 0; attempt < 4 && durationSec && durationSec < targetSec * 0.9; attempt++) {
+  const meta = getVoiceMeta(
+    (await listSystemVoices()).voices,
+    result.voice,
+  );
+  const isEl = meta?.engine === 'elevenlabs';
+
+  const minAcceptable = targetSec * 0.88;
+  const maxAttempts = isEl ? 2 : 6;
+
+  for (let attempt = 0; attempt < maxAttempts && durationSec && durationSec < minAcceptable; attempt++) {
     const ratio = durationSec / targetSec;
-    rate = Math.max(100, Math.min(220, Math.floor(rate * ratio * 0.92)));
-    console.log(`[TTS] Audio ${durationSec.toFixed(1)}s < ${targetSec}s — retry at rate ${rate}`);
+    rate = Math.max(80, Math.min(220, Math.floor(rate * ratio * 0.88)));
+    console.log(
+      `[TTS] Audio ${durationSec.toFixed(1)}s < ${targetSec}s target — retry ${attempt + 1} at rate ${rate}`,
+    );
     result = await generateNarration(sections, outputDir, { ...options, rate });
     durationSec = await getMediaDurationSec(result.combinedPath);
   }
 
-  if (durationSec && durationSec < targetSec * 0.92 && result.combinedPath) {
-    const padded = await padAudioToDuration(result.combinedPath, targetSec);
-    if (padded) {
-      result.combinedPath = padded;
-      durationSec = await getMediaDurationSec(padded);
-    }
+  if (durationSec && durationSec < minAcceptable) {
+    console.warn(
+      `[TTS] Narration is ${durationSec.toFixed(1)}s (target ${targetSec}s). Script may be too short or TTS is reading too fast.`,
+    );
   }
 
   return {
     ...result,
-    durationSec: durationSec || targetSec,
+    durationSec: durationSec || null,
     targetDurationSec: targetSec,
     rate,
   };
 }
 
-async function padAudioToDuration(audioPath, targetSec) {
-  const ffmpegBin = findFfmpegPath();
-  if (!ffmpegBin) return null;
-
-  const current = await getMediaDurationSec(audioPath);
-  if (!current || current >= targetSec * 0.95) return null;
-
-  const padSec = Math.max(1, targetSec - current);
-  const paddedPath = audioPath.replace(/(\.[^.]+)$/, '-padded$1');
-
-  try {
-    await execFileAsync(
-      ffmpegBin,
-      [
-        '-y',
-        '-i',
-        audioPath,
-        '-f',
-        'lavfi',
-        '-i',
-        `anullsrc=r=48000:cl=stereo:d=${padSec}`,
-        '-filter_complex',
-        '[0:a][1:a]concat=n=2:v=0:a=1[out]',
-        '-map',
-        '[out]',
-        '-c:a',
-        'libmp3lame',
-        '-q:a',
-        '2',
-        paddedPath,
-      ],
-      { timeout: 120_000 },
-    );
-    return fs.existsSync(paddedPath) ? paddedPath : null;
-  } catch (err) {
-    console.warn('[TTS] Could not pad audio:', err.message);
-    return null;
-  }
-}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, Loader2, RefreshCw, Play } from 'lucide-react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { healthCheck, listVoices, previewVoice, getVoicePreviewStatus } from '../../utils/api';
+import { healthCheck, listVoices, previewVoice } from '../../utils/api';
 import { useProjectStore } from '../../hooks/useProjectStore';
 
 function formatVoiceError(err: unknown): string {
@@ -26,34 +26,7 @@ export function VoiceSettings() {
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [ttsDevice, setTtsDevice] = useState<string | null>(null);
-  const [cacheStatus, setCacheStatus] = useState<{
-    warming: boolean;
-    complete: boolean;
-    ready: number;
-    total: number;
-  } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const pollPreviewCache = useCallback(async () => {
-    try {
-      const { data } = await getVoicePreviewStatus();
-      setCacheStatus(data);
-      if (!data.complete && (data.warming || data.ready < data.total)) {
-        const { data: voiceData } = await listVoices();
-        setVoices(
-          voiceData.voices?.map((v) => ({
-            id: v.id,
-            label: v.label || v.name,
-            previewUrl: v.previewUrl,
-            previewReady: v.previewReady,
-          })) || [],
-        );
-      }
-      return data.complete;
-    } catch {
-      return false;
-    }
-  }, []);
 
   const loadVoices = useCallback(async () => {
     setLoading(true);
@@ -69,7 +42,6 @@ export function VoiceSettings() {
           previewReady: v.previewReady,
         })) || [];
       setVoices(list);
-      if (data.previewCache) setCacheStatus(data.previewCache);
       if (data.device && data.device !== 'auto') setTtsDevice(data.device);
       const current = useProjectStore.getState().voiceSettings.voice;
       if (data.defaultVoice && !current) {
@@ -88,15 +60,6 @@ export function VoiceSettings() {
   useEffect(() => {
     loadVoices();
   }, [loadVoices]);
-
-  useEffect(() => {
-    if (cacheStatus?.complete) return;
-    const id = window.setInterval(async () => {
-      const done = await pollPreviewCache();
-      if (done) window.clearInterval(id);
-    }, 8000);
-    return () => window.clearInterval(id);
-  }, [cacheStatus?.complete, pollPreviewCache]);
 
   useEffect(() => {
     return () => {
@@ -159,10 +122,11 @@ export function VoiceSettings() {
     }
   };
 
-  const cacheHint =
-    cacheStatus && !cacheStatus.complete
-      ? `Preparing voice previews (${cacheStatus.ready}/${cacheStatus.total})…`
-      : null;
+  const selectedVoice = voices.find((v) => v.id === voiceSettings.voice);
+  const canPreview = Boolean(
+    selectedVoice?.previewUrl ||
+      selectedVoice?.id.startsWith('elevenlabs:'),
+  );
 
   return (
     <section className="p-3 rounded-xl bg-black/30 border border-forge-border/40">
@@ -175,13 +139,6 @@ export function VoiceSettings() {
         <p className="flex items-center gap-2 text-[10px] text-gray-500">
           <Loader2 className="w-3 h-3 animate-spin" />
           Loading voices…
-        </p>
-      )}
-
-      {cacheHint && !loading && (
-        <p className="flex items-center gap-2 text-[10px] text-amber-500/90 mb-2">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          {cacheHint}
         </p>
       )}
 
@@ -211,7 +168,6 @@ export function VoiceSettings() {
             {voices.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.label}
-                {v.previewReady ? '' : ' (preview pending)'}
               </option>
             ))}
           </select>
@@ -245,28 +201,33 @@ export function VoiceSettings() {
             <p className="text-[10px] text-red-400 mb-2">{previewError}</p>
           )}
 
-          <button
-            type="button"
-            onClick={handlePreview}
-            disabled={!voices.length}
-            className="w-full py-1.5 rounded-lg border border-forge-border/50 text-[10px] font-medium text-gray-400 hover:text-white hover:border-forge-accent/40 flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
-          >
-            {previewing ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {cacheHint ? 'Preparing…' : 'Playing…'}
-              </>
-            ) : (
-              <>
-                <Play className="w-3 h-3" />
-                Preview Voice
-              </>
-            )}
-          </button>
+          {canPreview ? (
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={!voices.length}
+              className="w-full py-1.5 rounded-lg border border-forge-border/50 text-[10px] font-medium text-gray-400 hover:text-white hover:border-forge-accent/40 flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+            >
+              {previewing ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Playing…
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  Preview Voice
+                </>
+              )}
+            </button>
+          ) : (
+            <p className="text-[9px] text-gray-600">
+              Voice preview uses ElevenLabs sample audio (local Chatterbox preview disabled).
+            </p>
+          )}
 
           <p className="text-[9px] text-gray-600 mt-2">
-            Chatterbox-Turbo + Multilingual v3 · {ttsDevice ? `device: ${ttsDevice}` : 'GPU auto'}
-            {cacheStatus?.complete ? ' · previews cached' : ''}
+            {ttsDevice ? `TTS device: ${ttsDevice}` : 'ElevenLabs + Chatterbox'}
           </p>
         </>
       )}

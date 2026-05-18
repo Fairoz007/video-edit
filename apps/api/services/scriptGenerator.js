@@ -1,6 +1,6 @@
 /**
- * Documentary script — Groq LLM when GROQ_API_KEY is set, else rule-based fallback.
- * Default target length: 3:00 with intro, main sections, and outro (subscribe / like).
+ * Documentary script — Gemini / Groq LLM when configured, else rule-based fallback.
+ * SCRIPT_PROVIDER: gemini | groq | auto (default: try Groq then Gemini).
  */
 import axios from 'axios';
 import * as cheerio from 'cheerio';
@@ -10,6 +10,7 @@ import {
   OUTRO_DURATION_SEC,
 } from '../constants/videoDefaults.js';
 import { generateScriptWithGroq, isGroqConfigured } from './groqScript.js';
+import { generateScriptWithGemini, isGeminiConfigured } from './geminiScript.js';
 import { expandScriptSections } from './scriptLength.js';
 import { isValidHttpUrl, normalizeHttpUrl } from '../utils/urlValidate.js';
 
@@ -195,26 +196,44 @@ function generateFallbackScript(primaryTopic, researchText, sourceMeta) {
   };
 }
 
-export async function generateDocumentaryScript(input) {
-  const { primaryTopic, researchText, wiki, sourceMeta } = await gatherResearchContext(input);
+async function applyLlmScript(script, researchText) {
+  script.sections = expandScriptSections(script.sections, researchText);
+  script.fullNarration = script.sections.map((s) => s.narration).join('\n\n');
+  return script;
+}
 
-  if (isGroqConfigured()) {
-    try {
-      const groqScript = await generateScriptWithGroq({
-        topic: primaryTopic,
-        researchText: researchText || wiki.extract,
-        sourceMeta,
-      });
-      groqScript.sections = expandScriptSections(
-        groqScript.sections,
-        researchText || wiki.extract,
-      );
-      groqScript.fullNarration = groqScript.sections.map((s) => s.narration).join('\n\n');
-      return groqScript;
-    } catch (err) {
-      console.warn('[Script] Groq failed, using fallback:', err.message);
-    }
+async function tryGenerateLlmScript(primaryTopic, researchText, sourceMeta) {
+  const provider = (process.env.SCRIPT_PROVIDER || 'auto').toLowerCase();
+  const research = researchText || '';
+  const args = { topic: primaryTopic, researchText: research, sourceMeta };
+
+  const attempts = [];
+  if (provider === 'gemini') {
+    if (isGeminiConfigured()) attempts.push(['Gemini', () => generateScriptWithGemini(args)]);
+    if (isGroqConfigured()) attempts.push(['Groq', () => generateScriptWithGroq(args)]);
+  } else if (provider === 'groq') {
+    if (isGroqConfigured()) attempts.push(['Groq', () => generateScriptWithGroq(args)]);
+  } else {
+    if (isGroqConfigured()) attempts.push(['Groq', () => generateScriptWithGroq(args)]);
+    if (isGeminiConfigured()) attempts.push(['Gemini', () => generateScriptWithGemini(args)]);
   }
 
-  return generateFallbackScript(primaryTopic, researchText || wiki.extract, sourceMeta);
+  for (const [name, fn] of attempts) {
+    try {
+      return await applyLlmScript(await fn(), research);
+    } catch (err) {
+      console.warn(`[Script] ${name} failed:`, err.message);
+    }
+  }
+  return null;
+}
+
+export async function generateDocumentaryScript(input) {
+  const { primaryTopic, researchText, wiki, sourceMeta } = await gatherResearchContext(input);
+  const research = researchText || wiki.extract;
+
+  const llmScript = await tryGenerateLlmScript(primaryTopic, research, sourceMeta);
+  if (llmScript) return llmScript;
+
+  return generateFallbackScript(primaryTopic, research, sourceMeta);
 }

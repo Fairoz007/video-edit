@@ -5,16 +5,12 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolvePython } from '../utils/resolvePython.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHATTERBOX_DIR = path.join(__dirname, '../chatterbox');
 const SCRIPT = path.join(CHATTERBOX_DIR, 'chatterbox_tts.py');
 const VOICES_JSON = path.join(CHATTERBOX_DIR, 'voices.json');
-
-const PYTHON =
-  process.env.CHATTERBOX_PYTHON ||
-  process.env.PYTHON_FOR_CHATTERBOX ||
-  'python3.11';
 
 let worker = null;
 let ready = false;
@@ -72,7 +68,7 @@ function handleWorkerLine(line) {
 function spawnWorker() {
   if (worker) return worker;
 
-  const proc = spawn(PYTHON, ['-u', SCRIPT, '--serve'], {
+  const proc = spawn(resolvePython(), ['-u', SCRIPT, '--serve'], {
     cwd: CHATTERBOX_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {
@@ -123,7 +119,7 @@ function spawnWorker() {
 }
 
 export function getChatterboxPython() {
-  return PYTHON;
+  return resolvePython();
 }
 
 let startingPromise = null;
@@ -189,7 +185,7 @@ export async function listChatterboxVoices() {
 function runOneShotSynthesize({ text, outputWav, voice, exaggeration, cfgWeight }) {
   return new Promise((resolve, reject) => {
     const args = ['-u', SCRIPT, '--text', text, '--output', outputWav, '--voice', voice || 'chatterbox-turbo'];
-    const proc = spawn(PYTHON, args, {
+    const proc = spawn(resolvePython(), args, {
       cwd: process.cwd(),
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -224,21 +220,28 @@ function runOneShotSynthesize({ text, outputWav, voice, exaggeration, cfgWeight 
   });
 }
 
+function defaultWorkerTimeoutMs() {
+  const fromEnv = Number(process.env.CHATTERBOX_WORKER_TIMEOUT_MS);
+  if (fromEnv > 0) return fromEnv;
+  return process.env.CHATTERBOX_DEVICE === 'cuda' ? 300_000 : 120_000;
+}
+
 export async function synthesizeChatterbox({
   text,
   outputWav,
   voice,
   exaggeration,
   cfgWeight,
+  forceOneshot = false,
 }) {
   const payload = { text, outputWav, voice, exaggeration, cfgWeight };
-  const useWorker = process.env.CHATTERBOX_ONESHOT === '0';
+  const useWorker = process.env.CHATTERBOX_ONESHOT === '0' && !forceOneshot;
 
   if (!useWorker) {
     return runOneShotSynthesize(payload);
   }
 
-  const workerTimeoutMs = Number(process.env.CHATTERBOX_WORKER_TIMEOUT_MS) || 20_000;
+  const workerTimeoutMs = defaultWorkerTimeoutMs();
   try {
     return await Promise.race([
       requestChatterbox('synthesize', payload),

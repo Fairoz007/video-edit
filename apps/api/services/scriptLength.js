@@ -38,15 +38,27 @@ export function expandScriptSections(sections, researchText = '') {
     if (!facts.length) break;
   }
 
-  if (total < MIN_NARRATION_WORDS * 0.7) {
-    for (const s of expanded) {
-      if (s.id === 'intro' || s.id === 'outro') continue;
-      const extra =
-        'This chapter shaped the broader narrative in ways historians still debate today, connecting past decisions to the world we see now.';
-      s.narration = `${s.narration} ${extra}`.trim();
-      total = expanded.reduce((a, sec) => a + countWords(sec.narration), 0);
-      if (total >= MIN_NARRATION_WORDS) break;
-    }
+  const fillerSentences = [
+    'This chapter shaped the broader narrative in ways historians still debate today, connecting past decisions to the world we see now.',
+    'Archives, oral histories, and contemporary reporting together paint a picture that is richer than any single headline.',
+    'Understanding this period means weighing context, culture, and the incentives that moved people and institutions at the time.',
+    'The details matter because they explain not only what happened, but why those events still echo in the present.',
+    'Scholars continue to revisit primary sources, adjusting the story as new evidence comes to light.',
+    'For viewers following along, keep these threads in mind as we move from origins through growth into the modern era.',
+  ];
+
+  let fillerIdx = 0;
+  while (total < MIN_NARRATION_WORDS) {
+    const targets = expanded.filter((s) => s.id !== 'intro' && s.id !== 'outro');
+    if (!targets.length) break;
+    const target = targets[fillerIdx % targets.length];
+    const extra = facts.length
+      ? facts[fillerIdx % facts.length]
+      : fillerSentences[fillerIdx % fillerSentences.length];
+    target.narration = `${target.narration} ${extra}`.trim();
+    total = expanded.reduce((a, sec) => a + countWords(sec.narration), 0);
+    fillerIdx++;
+    if (fillerIdx > MIN_NARRATION_WORDS * 2) break;
   }
 
   const sum = expanded.reduce((a, s) => a + (s.durationEstimate || 0), 0);

@@ -1,6 +1,8 @@
-# Chatterbox-TTS (Resemble AI) — Python 3.11 recommended
-chatterbox-tts>=0.1.0
-torch>=2.1.0
-torchaudio>=2.1.0
+# Chatterbox-TTS (Resemble AI) — GitHub build (Multilingual v3 + Perth watermarking)
+chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git
+resemble-perth @ git+https://github.com/resemble-ai/Perth.git
+# Windows NVIDIA: install CUDA wheels via setup (cu124). CPU-only omit index URL.
+torch==2.6.0
+torchaudio==2.6.0
 numpy>=1.24.0
 librosa>=0.10.0

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Run chatterbox_tts.py with resolved Python (reads .env for CHATTERBOX_PYTHON). */
-import { spawnSync, execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,19 +27,27 @@ function loadEnv() {
 
 function resolvePython() {
   loadEnv();
-  const candidates = [
-    process.env.CHATTERBOX_PYTHON,
-    'python3.11',
-    'python3.12',
-    'python3',
-    'python',
-  ].filter(Boolean);
+  const fromEnv = process.env.CHATTERBOX_PYTHON;
+  if (fromEnv && /^3\.\d{1,2}$/.test(fromEnv)) {
+    const r = spawnSync('py', [`-${fromEnv}`, '-c', 'import sys; print(sys.executable)'], {
+      encoding: 'utf8',
+    });
+    if (r.status === 0) return (r.stdout || '').trim();
+  }
+
+  const candidates = [fromEnv, 'python3.13', 'python3.12', 'python3', 'python'].filter(Boolean);
   for (const bin of candidates) {
-    try {
-      execSync(`command -v ${bin}`, { stdio: 'ignore', shell: true });
-      return bin;
-    } catch {
-      /* next */
+    if (!bin || /^3\.\d{1,2}$/.test(bin)) continue;
+    const r = spawnSync(bin, ['--version'], { stdio: 'ignore', shell: true });
+    if (r.status === 0) return bin;
+  }
+
+  if (process.platform === 'win32') {
+    for (const ver of ['3.13', '3.12']) {
+      const r = spawnSync('py', [`-${ver}`, '-c', 'import sys; print(sys.executable)'], {
+        encoding: 'utf8',
+      });
+      if (r.status === 0) return (r.stdout || '').trim();
     }
   }
   console.error('[chatterbox] Python not found. Install 3.11+ and run npm run setup');
