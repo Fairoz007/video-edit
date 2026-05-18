@@ -24,8 +24,11 @@ function readLocalCatalog() {
   };
 }
 
-export async function listSystemVoices() {
-  return readLocalCatalog();
+export async function listSystemVoices(root) {
+  const catalog = readLocalCatalog();
+  if (!root) return catalog;
+  const { attachPreviewUrls } = await import('./voicePreviewCache.js');
+  return attachPreviewUrls(root, catalog);
 }
 
 const LEGACY_VOICE_MAP = {

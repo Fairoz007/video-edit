@@ -98,3 +98,7 @@ Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same l
 ## Future AI (disabled)
 
 See `apps/api/services/aiPlaceholder.js` for OpenAI, Ollama, Whisper, ElevenLabs hooks.
+
+
+
+

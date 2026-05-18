@@ -38,6 +38,10 @@ export interface SystemVoice {
   name: string;
   locale: string;
   label: string;
+  previewUrl?: string;
+  previewReady?: boolean;
+  language?: string;
+  engine?: string;
 }
 
 export interface TtsHealth {
@@ -55,7 +59,17 @@ export const listVoices = () =>
     provider?: string;
     tts?: TtsHealth;
     paralinguisticTags?: string[];
+    previewCache?: { warming: boolean; complete: boolean; ready: number; total: number };
   }>('/pipeline/voices');
+
+export const getVoicePreviewStatus = () =>
+  api.get<{
+    warming: boolean;
+    complete: boolean;
+    ready: number;
+    total: number;
+    missing: string[];
+  }>('/pipeline/voice/previews/status');
 
 export const previewVoice = (payload: {
   voice?: string;
@@ -63,7 +77,7 @@ export const previewVoice = (payload: {
   pitch?: number;
   text?: string;
 }) =>
-  api.post<{ url: string; voice: string; rate: number; pitch: number }>(
+  api.post<{ url: string; voice: string; rate: number; pitch: number; cached?: boolean }>(
     '/pipeline/voice/preview',
     payload,
     { timeout: 600_000 },

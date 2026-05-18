@@ -4,6 +4,11 @@ import { extractKeywords } from '../services/keywordExtractor.js';
 import { generateNarration, generateVoicePreview } from '../services/voiceGenerator.js';
 import { listSystemVoices } from '../services/voiceLister.js';
 import { chatterboxHealth } from '../services/chatterboxBridge.js';
+import {
+  getCachedPreset,
+  getPreviewCacheStatus,
+  warmVoicePreviews,
+} from '../services/voicePreviewCache.js';
 import { writeSubtitles } from '../services/subtitleGenerator.js';
 import { buildTimeline } from '../services/timelineBuilder.js';
 import { projectDir } from '../utils/paths.js';
@@ -40,8 +45,21 @@ export function createPipelineRouter(root) {
 
   router.get('/voices', async (_req, res) => {
     try {
-      const data = await listSystemVoices();
+      const data = await listSystemVoices(root);
       res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/voice/previews/status', (_req, res) => {
+    res.json(getPreviewCacheStatus(root));
+  });
+
+  router.post('/voice/previews/warm', async (_req, res) => {
+    try {
+      warmVoicePreviews(root);
+      res.json({ ok: true, ...getPreviewCacheStatus(root) });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -58,6 +76,11 @@ export function createPipelineRouter(root) {
   router.post('/voice/preview', async (req, res) => {
     try {
       const { voice, rate, pitch, text } = req.body;
+      const cached = getCachedPreset(root, voice, rate, pitch);
+      if (cached && !text) {
+        return res.json({ ...cached, provider: 'chatterbox' });
+      }
+
       const cacheDir = path.join(root, 'cache', 'voice-preview');
       fs.mkdirSync(cacheDir, { recursive: true });
       const filename = `preview-${Date.now()}.mp3`;
@@ -69,6 +92,7 @@ export function createPipelineRouter(root) {
         voice: result.voice,
         rate: result.rate,
         pitch: result.pitch,
+        cached: false,
         provider: 'chatterbox',
       });
     } catch (err) {

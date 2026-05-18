@@ -16,6 +16,7 @@ import { createScrapeRouter } from './routes/scrape.js';
 import { createExportsRouter } from './routes/exports.js';
 import { initFfmpeg } from './utils/ffmpegPath.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
+import { warmVoicePreviews } from './services/voicePreviewCache.js';
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -65,6 +66,7 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(
     `[DocuForge] TTS: Chatterbox-Turbo + Multilingual v3 (python: ${process.env.CHATTERBOX_PYTHON || 'python3.11'})`,
   );
+  warmVoicePreviews(ROOT);
 });
 
 server.on('error', (err) => {
