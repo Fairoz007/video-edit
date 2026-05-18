@@ -9,13 +9,10 @@
     "dev": "tsc -p tsconfig.electron.json && wait-on tcp:5173 tcp:3847 && cross-env NODE_ENV=development electron .",
     "build:app": "npm run build:electron -w @docuforge/desktop && npm run build -w @docuforge/web && electron-builder"
   },
-  "dependencies": {
-    "@docuforge/config": "*"
-  },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "cross-env": "^7.0.3",
-    "electron": "^33.3.1",
+    "electron": "33.3.1",
     "electron-builder": "^25.1.8",
     "typescript": "^5.7.2",
     "wait-on": "^8.0.1"

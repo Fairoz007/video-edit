@@ -26,7 +26,8 @@
     "moviepy": "python3 apps/api/moviepy/moviepy_renderer.py",
     "chatterbox:install": "python3.11 -m pip install -r apps/api/chatterbox/requirements.txt",
     "chatterbox:health": "python3.11 apps/api/chatterbox/chatterbox_tts.py --health",
-    "postinstall": "electron-builder install-app-deps -w @docuforge/desktop && npx playwright install chromium",
+    "postinstall": "npx playwright install chromium",
+    "install:electron-deps": "npx electron-builder install-app-deps --config apps/desktop/package.json",
     "playwright:install": "npx playwright install chromium",
     "clean:workspace": "node scripts/clean-workspace.mjs"
   },
