@@ -9,12 +9,16 @@ import {
   transitionPresentation,
   transitionTiming,
 } from '../lib/transitions';
-import type { Scene } from '../types';
+import type { ChapterBadgeSpec, Scene, WordCue } from '../types';
 import { IntroGraphic } from './IntroGraphic';
 import { OutroGraphic } from './OutroGraphic';
 import { AnimatedSubtitle, type SubtitleCue } from './AnimatedSubtitle';
+import { KineticSubtitles } from './KineticSubtitles';
 import { MotionAccent } from './MotionAccent';
 import { SceneSlide } from './SceneSlide';
+import { GlobalProgressBar } from './GlobalProgressBar';
+import { CornerBrackets } from './CornerBrackets';
+import { ChapterBadgeLayer } from './ChapterBadge';
 
 export type { Scene };
 
@@ -23,6 +27,8 @@ export interface DocumentaryProps {
   sections: { id: string; title: string; narration: string }[];
   scenes: Scene[];
   subtitleCues?: SubtitleCue[];
+  wordCues?: WordCue[];
+  chapterBadges?: ChapterBadgeSpec[];
   totalDuration?: number;
   introGraphicSec?: number;
   outroGraphicSec?: number;
@@ -30,7 +36,7 @@ export interface DocumentaryProps {
   narrationAudioSrc?: string;
 }
 
-const SCENE_TRANSITIONS: TransitionKind[] = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
+const SCENE_TRANSITIONS: TransitionKind[] = ['crossfade', 'crossfade', 'slide', 'wipe', 'zoom'];
 
 function resolveSceneSrc(src: string): string {
   return src;
@@ -81,7 +87,9 @@ export const DocumentaryComposition: React.FC<DocumentaryProps> = ({
   title,
   scenes,
   subtitleCues = [],
-  introGraphicSec = 5,
+  wordCues = [],
+  chapterBadges = [],
+  introGraphicSec = 3,
   outroGraphicSec = 8,
   channelName = 'DocuForge',
   narrationAudioSrc,
@@ -94,10 +102,12 @@ export const DocumentaryComposition: React.FC<DocumentaryProps> = ({
   const sceneDurationTotal = scenes.reduce((a, s) => a + s.duration, 0) || 1;
   const scale = contentFrames / fps / sceneDurationTotal;
 
+  const useKinetic = wordCues.length > 0;
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#0a0a0f' }}>
       <Sequence from={0} durationInFrames={introFrames}>
-        <IntroGraphic title={title} subtitle="A Documentary" />
+        <IntroGraphic title={title} subtitle="A DocuForge Documentary" channelName={channelName} />
       </Sequence>
 
       <Sequence from={introFrames} durationInFrames={contentFrames}>
@@ -108,11 +118,27 @@ export const DocumentaryComposition: React.FC<DocumentaryProps> = ({
         <OutroGraphic channelName={channelName} />
       </Sequence>
 
+      <AbsoluteFill
+        style={{
+          background:
+            'radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.35) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <GlobalProgressBar />
+      <CornerBrackets />
       <MotionAccent />
-      {subtitleCues.length > 0 && <AnimatedSubtitle cues={subtitleCues} />}
+      {chapterBadges.length > 0 && <ChapterBadgeLayer badges={chapterBadges} />}
+
+      {useKinetic ? (
+        <KineticSubtitles wordCues={wordCues} />
+      ) : (
+        subtitleCues.length > 0 && <AnimatedSubtitle cues={subtitleCues} />
+      )}
+
       {narrationAudioSrc && (
         <Sequence from={introFrames}>
-          <Audio src={resolveMediaSrc(narrationAudioSrc)} />
+          <Audio src={resolveMediaSrc(narrationAudioSrc)} volume={1} />
         </Sequence>
       )}
     </AbsoluteFill>

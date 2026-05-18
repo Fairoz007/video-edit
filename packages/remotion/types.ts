@@ -1,4 +1,12 @@
 import type { TransitionKind } from './lib/transitions';
+import type { ColorGrade } from './lib/colorGrade';
+
+export interface SceneLowerThird {
+  name?: string;
+  title?: string;
+  fromFrame?: number;
+  durationFrames?: number;
+}
 
 export interface Scene {
   src: string;
@@ -6,7 +14,26 @@ export interface Scene {
   duration: number;
   caption?: string;
   sectionTitle?: string;
+  sectionIndex?: number;
   transition?: TransitionKind;
+  colorGrade?: ColorGrade | string;
+  kenBurnsFrom?: number;
+  kenBurnsTo?: number;
+  panStartX?: number;
+  panEndX?: number;
+  lowerThird?: SceneLowerThird;
+}
+
+export interface ChapterBadgeSpec {
+  label: string;
+  fromFrame: number;
+  durationFrames: number;
+}
+
+export interface WordCue {
+  word: string;
+  startSec: number;
+  endSec: number;
 }
 
 export interface WalkthroughScreen {

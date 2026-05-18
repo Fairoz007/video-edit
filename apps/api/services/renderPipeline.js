@@ -16,7 +16,10 @@ import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
 import { buildRemotionProps, renderRemotionPreview } from './remotionRenderer.js';
 import { exportDocumentary, exportVideoOnly } from './videoRenderer.js';
-import { syncSectionDurationsFromAudio } from '../utils/sectionTiming.js';
+import {
+  balanceSectionDurations,
+  syncSectionDurationsFromAudio,
+} from '../utils/sectionTiming.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValidate.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
@@ -167,6 +170,7 @@ export class RenderPipeline {
         project.narration = { tracks, combinedPath, audioDurationSec };
 
         script.sections = syncSectionDurationsFromAudio(script.sections, audioDurationSec);
+        script.sections = balanceSectionDurations(script.sections);
         project.script = script;
         fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
       }
@@ -177,11 +181,12 @@ export class RenderPipeline {
         project.subtitleCues = [];
       } else {
         report('subtitles', 45, 'Creating animated subtitle cues...');
-        const { cues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
+        const { cues, wordCues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
           introOffsetSec: REMOTION_INTRO_GRAPHIC_SEC,
           audioDurationSec,
         });
         project.subtitleCues = cues;
+        project.wordCues = wordCues;
       }
 
       const videoStyle = project.input?.videoStyle || 'documentary';
@@ -232,6 +237,7 @@ export class RenderPipeline {
         timeline,
         walkthrough,
         subtitleCues: project.subtitleCues,
+        wordCues: project.wordCues,
       });
       let videoPath = path.join(dir, 'renders', 'remotion-output.mp4');
       fs.mkdirSync(path.dirname(videoPath), { recursive: true });

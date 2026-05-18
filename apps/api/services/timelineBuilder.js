@@ -7,12 +7,17 @@ import {
   REMOTION_OUTRO_GRAPHIC_SEC,
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
-import { syncSectionsToVideoTimeline } from '../utils/sectionTiming.js';
+import {
+  balanceSectionDurations,
+  syncSectionsToVideoTimeline,
+} from '../utils/sectionTiming.js';
+
+const COLOR_GRADES = ['warm_golden', 'cool_blue', 'cinematic_teal_orange', 'warm_contrast'];
 
 const CONTENT_DURATION =
   TARGET_VIDEO_DURATION_SEC - REMOTION_INTRO_GRAPHIC_SEC - REMOTION_OUTRO_GRAPHIC_SEC;
 
-const TRANSITIONS = ['crossfade', 'slide', 'zoom', 'fade'];
+const TRANSITIONS = ['crossfade', 'crossfade', 'wipe', 'slide'];
 
 function expandMediaPool(manifest, minClips) {
   if (!manifest.length) return [];
@@ -42,7 +47,8 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     sections = syncSectionsToVideoTimeline(sections, [], contentTarget);
   }
 
-  const sectionDurations = sections.map(
+  let balancedSections = balanceSectionDurations(sections);
+  const sectionDurations = balancedSections.map(
     (s) => s.durationEstimate || contentTarget / sectionCount,
   );
   const narrationTotal = sectionDurations.reduce((a, b) => a + b, 0);
@@ -53,25 +59,47 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   let timeCursor = REMOTION_INTRO_GRAPHIC_SEC;
 
   for (let i = 0; i < sectionCount; i++) {
-    const section = sections[i];
+    const section = balancedSections[i];
     const sectionDuration = sectionDurations[i] * scale;
-    const clipCount = Math.min(mediaPerSection, pool.length);
+    const clipCount = Math.min(2, mediaPerSection, pool.length);
     const clipDuration = sectionDuration / clipCount;
+    const colorGrade = COLOR_GRADES[i % COLOR_GRADES.length];
+    const isFirstSectionScene = (j) => j === 0;
 
     for (let j = 0; j < clipCount; j++) {
       const asset = pool[mediaIndex % pool.length];
       mediaIndex++;
       const duration = Math.max(2.5, clipDuration);
+      const atSectionEdge = j === 0 || j === clipCount - 1;
       scenes.push({
         id: `scene-${i}-${j}`,
         sectionId: section.id,
+        sectionIndex: i,
         start: timeCursor,
         duration,
         media: asset,
-        transition: TRANSITIONS[(i + j) % TRANSITIONS.length],
+        transition: atSectionEdge ? 'crossfade' : TRANSITIONS[(i + j) % TRANSITIONS.length],
         effect: asset.type === 'image' ? 'ken-burns' : 'none',
-        narration: videoOnly ? '' : j === 0 ? section.narration : '',
-        sectionTitle: j === 0 ? section.title : undefined,
+        colorGrade,
+        narration: videoOnly ? '' : isFirstSectionScene(j) ? section.narration : '',
+        sectionTitle: isFirstSectionScene(j) ? section.title : undefined,
+        lowerThird:
+          isFirstSectionScene(j) && section.lowerThirdName
+            ? {
+                name: section.lowerThirdName,
+                title: section.lowerThirdTitle,
+                fromFrame: 12,
+                durationFrames: 100,
+              }
+            : isFirstSectionScene(j)
+              ? {
+                  name: section.subjectName || section.title,
+                  title: section.lowerThirdSubtitle,
+                  fromFrame: 12,
+                  durationFrames: 100,
+                }
+              : undefined,
+        chapterBadgeLabel: isFirstSectionScene(j) ? section.title : undefined,
       });
       timeCursor += duration;
     }
@@ -81,7 +109,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   const totalDuration =
     REMOTION_INTRO_GRAPHIC_SEC + contentEnd + REMOTION_OUTRO_GRAPHIC_SEC;
 
-  const syncedSections = syncSectionsToVideoTimeline(sections, scenes, contentEnd);
+  const syncedSections = syncSectionsToVideoTimeline(balancedSections, scenes, contentEnd);
 
   return {
     scenes,

@@ -29,6 +29,47 @@ function wrapText(text, maxLen = 42) {
   return lines.join('\n');
 }
 
+/** Word-by-word cues for kinetic subtitles (Remotion KineticSubtitles). */
+export function buildWordCues(sections, options = {}) {
+  const introOffset = options.introOffsetSec || 0;
+  let cursor = introOffset;
+  const cues = [];
+
+  for (const section of sections) {
+    const words = (section.narration || '').split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+
+    const sectionDuration = section.durationEstimate || 12;
+    const timePerWord = sectionDuration / words.length;
+
+    for (const word of words) {
+      const duration = Math.max(0.14, Math.min(timePerWord, 0.5));
+      cues.push({
+        word,
+        startSec: cursor,
+        endSec: cursor + duration,
+        sectionId: section.id,
+      });
+      cursor += duration;
+    }
+    cursor += 0.06;
+  }
+
+  if (options.audioDurationSec && cues.length) {
+    const contentEnd = cues[cues.length - 1].endSec - introOffset;
+    if (contentEnd > 0) {
+      const scale = options.audioDurationSec / contentEnd;
+      return cues.map((c) => ({
+        ...c,
+        startSec: introOffset + (c.startSec - introOffset) * scale,
+        endSec: introOffset + (c.endSec - introOffset) * scale,
+      }));
+    }
+  }
+
+  return cues;
+}
+
 export function buildSubtitleCues(sections, options = {}) {
   const wordsPerSecond = (options.wordsPerMinute || NARRATION_WORDS_PER_MINUTE) / 60;
   const introOffset = options.introOffsetSec || 0;
@@ -120,5 +161,9 @@ export function writeSubtitles(sections, outputDir, options = {}) {
   const cuesPath = path.join(outputDir, 'subtitle-cues.json');
   fs.writeFileSync(cuesPath, JSON.stringify(cues, null, 2));
 
-  return { srtPath, cuesPath, cues };
+  const wordCues = buildWordCues(sections, options);
+  const wordCuesPath = path.join(outputDir, 'word-cues.json');
+  fs.writeFileSync(wordCuesPath, JSON.stringify(wordCues, null, 2));
+
+  return { srtPath, cuesPath, cues, wordCues, wordCuesPath };
 }

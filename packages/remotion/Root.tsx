@@ -30,7 +30,7 @@ export const RemotionRoot: React.FC = () => {
           scenes: [],
           subtitleCues: [],
           totalDuration: DEFAULT_DURATION_SEC,
-          introGraphicSec: 5,
+          introGraphicSec: 3,
           outroGraphicSec: 8,
           channelName: 'DocuForge',
         }}

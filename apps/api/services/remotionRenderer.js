@@ -114,6 +114,25 @@ export function buildWalkthroughProps(project) {
   };
 }
 
+function buildChapterBadges(timeline, fps, introSec) {
+  const badges = [];
+  const seen = new Set();
+  for (const scene of timeline?.scenes || []) {
+    if (!scene.chapterBadgeLabel || seen.has(scene.sectionId)) continue;
+    seen.add(scene.sectionId);
+    const sectionScenes = timeline.scenes.filter((s) => s.sectionId === scene.sectionId);
+    const sectionDuration = sectionScenes.reduce((a, s) => a + (s.duration || 0), 0);
+    const fromFrame = Math.round((scene.start || introSec) * fps);
+    const visibleSec = Math.min(4, Math.max(2.5, sectionDuration * 0.35));
+    badges.push({
+      label: scene.chapterBadgeLabel,
+      fromFrame,
+      durationFrames: Math.round(visibleSec * fps),
+    });
+  }
+  return badges;
+}
+
 export function buildRemotionProps(project) {
   const compositionId = resolveCompositionId(project);
   if (compositionId === 'Walkthrough') {
@@ -124,6 +143,9 @@ export function buildRemotionProps(project) {
   const sectionById = Object.fromEntries((script?.sections || []).map((s) => [s.id, s]));
 
   const transitions = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
+  const introSec = REMOTION_INTRO_GRAPHIC_SEC;
+  const fps = 30;
+
   const scenes =
     timeline?.scenes?.map((s, i) => ({
       src: s.media?.localPath || s.media?.url || '',
@@ -132,6 +154,13 @@ export function buildRemotionProps(project) {
       transition: s.transition || transitions[i % transitions.length],
       caption: sectionById[s.sectionId]?.title,
       sectionTitle: s.sectionTitle || sectionById[s.sectionId]?.title,
+      sectionIndex: s.sectionIndex ?? 0,
+      colorGrade: s.colorGrade,
+      lowerThird: s.lowerThird,
+      kenBurnsFrom: s.sectionIndex % 2 === 0 ? 1.06 : 1.05,
+      kenBurnsTo: 1,
+      panStartX: s.sectionIndex % 2 === 0 ? 0 : 20,
+      panEndX: s.sectionIndex % 2 === 0 ? -20 : 0,
     })) ||
     media?.map((m, i) => ({
       src: m.localPath || m.url,
@@ -141,15 +170,19 @@ export function buildRemotionProps(project) {
     })) ||
     [];
 
+  const chapterBadges = timeline ? buildChapterBadges(timeline, fps, introSec) : [];
+
   return {
     title: script?.topic || 'Documentary',
     sections: script?.sections || [],
     scenes: scenes.filter((s) => s.src),
     subtitleCues: project.subtitleCues || [],
+    wordCues: project.wordCues || [],
+    chapterBadges,
     totalDuration: timeline?.totalDuration || TARGET_VIDEO_DURATION_SEC,
-    introGraphicSec: REMOTION_INTRO_GRAPHIC_SEC,
+    introGraphicSec: introSec,
     outroGraphicSec: REMOTION_OUTRO_GRAPHIC_SEC,
-    channelName: process.env.CHANNEL_NAME || script?.topic || 'DocuForge',
+    channelName: process.env.CHANNEL_NAME || 'DocuForge',
     narrationAudioSrc:
       project.input?.editMode === 'video-only'
         ? undefined

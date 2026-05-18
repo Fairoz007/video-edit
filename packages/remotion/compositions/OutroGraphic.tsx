@@ -1,5 +1,13 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import {
+  AbsoluteFill,
+  Easing,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion';
+import { displayFamily, interFamily } from '../lib/fonts';
 
 export interface OutroGraphicProps {
   channelName?: string;
@@ -10,30 +18,20 @@ function CtaButton({
   label,
   accent,
   delay,
+  phaseOffset = 0,
 }: {
   icon: string;
   label: string;
   accent: string;
   delay: number;
+  phaseOffset?: number;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const scale = spring({ frame: frame - delay, fps, config: { damping: 12 } });
+  const enter = spring({ frame: frame - delay, fps, config: { damping: 12 } });
+  const slideY = interpolate(enter, [0, 1], [20, 0], { extrapolateRight: 'clamp' });
+  const pulse = 1 + Math.sin((frame + phaseOffset) / 30) * 0.04;
 
-  return <CtaBlock icon={icon} label={label} accent={accent} scale={Math.max(0, scale)} />;
-}
-
-function CtaBlock({
-  icon,
-  label,
-  accent,
-  scale,
-}: {
-  icon: string;
-  label: string;
-  accent: string;
-  scale: number;
-}) {
   return (
     <div
       style={{
@@ -41,34 +39,24 @@ function CtaBlock({
         flexDirection: 'column',
         alignItems: 'center',
         gap: 12,
-        transform: `scale(${scale})`,
+        opacity: Math.max(0, enter),
+        transform: `translateY(${slideY}px) scale(${Math.max(0, enter) * pulse})`,
       }}
     >
       <div
         style={{
-          width: 100,
-          height: 100,
-          borderRadius: 24,
-          background: `linear-gradient(135deg, ${accent}, ${accent}99)`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 48,
-          boxShadow: `0 12px 40px ${accent}55`,
-        }}
-      >
-        {icon}
-      </div>
-      <span
-        style={{
-          color: '#e2e8f0',
-          fontSize: 26,
+          padding: '14px 28px',
+          borderRadius: 12,
+          background: accent,
+          fontSize: 22,
           fontWeight: 600,
-          fontFamily: 'Inter, system-ui, sans-serif',
+          color: '#fff',
+          fontFamily: interFamily,
+          boxShadow: `0 8px 32px ${accent}66`,
         }}
       >
-        {label}
-      </span>
+        {icon} {label}
+      </div>
     </div>
   );
 }
@@ -77,38 +65,61 @@ export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuF
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
-  const enter = spring({ frame, fps, config: { damping: 14 } });
-  const pulse = 1 + Math.sin(frame / 8) * 0.04;
+  const thanksOpacity = interpolate(frame, [10, 35], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const brandEnter = spring({ frame: frame - 20, fps, config: { damping: 14, stiffness: 90 } });
+  const brandScale = interpolate(brandEnter, [0, 1], [0.85, 1]);
 
-  const fadeOut = interpolate(
+  const endFade = interpolate(
     frame,
-    [durationInFrames - 20, durationInFrames],
-    [1, 0],
+    [durationInFrames - 25, durationInFrames],
+    [1, 0.85],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
   return (
     <AbsoluteFill
       style={{
-        background: 'linear-gradient(160deg, #0a0a12 0%, #1e1b4b 50%, #312e81 100%)',
+        background: 'radial-gradient(ellipse at center, #0F0A1E 0%, #12101f 55%, #000000 100%)',
         justifyContent: 'center',
         alignItems: 'center',
-        opacity: fadeOut,
+        opacity: endFade,
       }}
     >
-      <div
-        style={{
-          textAlign: 'center',
-          transform: `scale(${enter * pulse})`,
-          opacity: enter,
-        }}
-      >
+      {Array.from({ length: 20 }, (_, i) => {
+        const x = 10 + ((i * 97) % 80);
+        const y = 15 + ((i * 53) % 70);
+        const drift = Math.sin((frame + i * 12) / 45) * 8;
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${x}%`,
+              top: `${y + drift * 0.1}%`,
+              width: 8 + (i % 4) * 2,
+              height: 8 + (i % 4) * 2,
+              borderRadius: '50%',
+              background: `rgba(124,58,237,${0.15 + (i % 3) * 0.08})`,
+              filter: 'blur(1px)',
+            }}
+          />
+        );
+      })}
+
+      <div style={{ textAlign: 'center' }}>
         <p
           style={{
-            color: '#c4b5fd',
-            fontSize: 28,
-            marginBottom: 12,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            color: '#94A3B8',
+            fontSize: 20,
+            letterSpacing: 3,
+            marginBottom: 16,
+            fontFamily: interFamily,
+            fontWeight: 300,
+            opacity: thanksOpacity,
           }}
         >
           Thanks for watching
@@ -116,17 +127,20 @@ export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuF
         <h2
           style={{
             color: '#fff',
-            fontSize: 56,
+            fontSize: 64,
             fontWeight: 700,
             margin: '0 0 48px',
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: displayFamily,
+            letterSpacing: 10,
+            opacity: Math.max(0, brandEnter),
+            transform: `scale(${brandScale})`,
           }}
         >
           {channelName}
         </h2>
-        <div style={{ display: 'flex', gap: 48, justifyContent: 'center', alignItems: 'center' }}>
-          <CtaButton icon="🔔" label="Subscribe" accent="#ef4444" delay={8} />
-          <CtaButton icon="👍" label="Like" accent="#3b82f6" delay={14} />
+        <div style={{ display: 'flex', gap: 40, justifyContent: 'center' }}>
+          <CtaButton icon="🔔" label="Subscribe" accent="#7C3AED" delay={35} />
+          <CtaButton icon="👍" label="Like" accent="#EC4899" delay={42} phaseOffset={30} />
         </div>
       </div>
     </AbsoluteFill>

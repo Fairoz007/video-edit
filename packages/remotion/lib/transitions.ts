@@ -6,7 +6,7 @@ import { flip } from '@remotion/transitions/flip';
 
 export type TransitionKind = 'fade' | 'crossfade' | 'slide' | 'zoom' | 'wipe' | 'flip';
 
-const TRANSITION_DURATION = 18;
+const TRANSITION_DURATION = 20;
 
 export function transitionTiming(kind: TransitionKind): TransitionTiming {
   if (kind === 'zoom' || kind === 'slide') {

@@ -1,44 +1,49 @@
 import React from 'react';
-import { Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useCurrentFrame } from 'remotion';
+import { slideFadeOpacity, slideFadeX } from '../lib/animations';
 import { displayFamily, interFamily } from '../lib/fonts';
 
 export interface LowerThirdProps {
   title: string;
   subtitle?: string;
+  durationFrames?: number;
 }
 
-export const LowerThird: React.FC<LowerThirdProps> = ({ title, subtitle }) => {
+export const LowerThird: React.FC<LowerThirdProps> = ({
+  title,
+  subtitle,
+  durationFrames = 100,
+}) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const slide = spring({ frame, fps, config: { damping: 20 } });
-  const opacity = interpolate(frame, [0, 8], [0, 1], {
-    extrapolateRight: 'clamp',
-    easing: Easing.bezier(0.16, 1, 0.3, 1),
-  });
+  const enterFrames = 18;
+  const exitStart = Math.max(enterFrames + 24, durationFrames - 12);
+  const exitFrames = 12;
+
+  const opacity = slideFadeOpacity(frame, enterFrames, exitStart, exitFrames, durationFrames);
+  const x = slideFadeX(frame, enterFrames, -80, exitStart, exitFrames, -60);
 
   return (
     <div
       style={{
         position: 'absolute',
-        left: 48,
-        bottom: 120,
+        left: 60,
+        bottom: '25%',
         opacity,
-        transform: `translateX(${(1 - slide) * -80}px)`,
+        transform: `translateX(${x}px)`,
+        pointerEvents: 'none',
       }}
     >
       <div
         style={{
-          background: 'linear-gradient(90deg, rgba(99,102,241,0.95), rgba(168,85,247,0.85))',
-          padding: '14px 28px',
-          borderRadius: 8,
-          borderLeft: '4px solid #f0abfc',
+          borderLeft: '4px solid #7C3AED',
+          paddingLeft: 16,
         }}
       >
         <p
           style={{
             margin: 0,
             color: '#fff',
-            fontSize: 32,
+            fontSize: 26,
             fontWeight: 700,
             fontFamily: displayFamily,
           }}
@@ -48,9 +53,9 @@ export const LowerThird: React.FC<LowerThirdProps> = ({ title, subtitle }) => {
         {subtitle && (
           <p
             style={{
-              margin: '4px 0 0',
-              color: '#e0e7ff',
-              fontSize: 18,
+              margin: '6px 0 0',
+              color: '#94A3B8',
+              fontSize: 16,
               fontFamily: interFamily,
             }}
           >

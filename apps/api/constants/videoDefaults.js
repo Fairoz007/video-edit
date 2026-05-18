@@ -7,7 +7,7 @@ export const TARGET_VIDEO_DURATION_SEC = parseInt(
 export const INTRO_DURATION_SEC = 20;
 export const OUTRO_DURATION_SEC = 20;
 
-export const REMOTION_INTRO_GRAPHIC_SEC = 5;
+export const REMOTION_INTRO_GRAPHIC_SEC = 3;
 export const REMOTION_OUTRO_GRAPHIC_SEC = 8;
 
 /** Spoken pacing — used for script length and subtitle timing. */
