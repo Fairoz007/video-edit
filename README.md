@@ -31,25 +31,33 @@ Automatic documentary video generator — **no AI APIs** for scripting. Uses rul
 ## Prerequisites
 
 - **Node.js** 18+
+- **Python 3.11+** (for Chatterbox TTS + MoviePy)
 - **FFmpeg** on PATH (`brew install ffmpeg`)
-- **Python 3** + MoviePy (`pip install -r apps/api/moviepy/requirements.txt`)
-- API keys in `.env` (copy from `.env.example`)
 
-## Quick start
+## Quick start (after clone)
 
 ```bash
-cp .env.example .env
-# Add PEXELS_API_KEY, PIXABAY_API_KEY, UNSPLASH_ACCESS_KEY
-
+git clone <repo-url> docuforge && cd docuforge
 npm install
-python3 -m pip install -r apps/api/moviepy/requirements.txt
-
-# Full stack (API + Vite + Electron)
-npm run dev
-
-# Web only (API + Vite, no Electron)
-npm run dev:web
 ```
+
+`npm install` runs **automatic setup**:
+
+1. Creates `.env` from `.env.example` (if missing)
+2. `pip install` for Chatterbox + MoviePy
+3. Downloads Chatterbox-Turbo model weights (Hugging Face)
+4. Installs Playwright Chromium
+
+Then add API keys to `.env` (Pexels, Pixabay, Groq, etc.) and start:
+
+```bash
+npm run dev          # API + web + Electron
+npm run dev:web      # API + web only
+```
+
+**Skip auto-setup** (CI / no Python): `DOCUFORGE_SKIP_SETUP=1 npm install`  
+**Re-download models**: `npm run setup` or `DOCUFORGE_FORCE_SETUP=1 npm run setup`  
+**Also prefetch multilingual model**: `CHATTERBOX_SETUP_MODELS=turbo,mtl npm run setup`
 
 If you see **port already in use**, run:
 
@@ -68,6 +76,8 @@ Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same l
 | `npm run dev -w @docuforge/api` | Backend only |
 | `npm run dev -w @docuforge/web` | Vite only |
 | `npm run remotion:studio` | Remotion Studio |
+| `npm run setup` | Re-run Python deps + Chatterbox model download |
+| `npm run chatterbox:health` | Check TTS / device |
 | `npm run clean:workspace` | Clear projects/cache/exports |
 
 ## Pipeline

@@ -24,6 +24,16 @@ let nextId = 1;
 const pending = new Map();
 let stdoutBuffer = '';
 
+/** Python worker already prefixes many lines with [Chatterbox]. */
+function logChatterboxStderr(chunk) {
+  for (const line of chunk.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const msg = trimmed.replace(/^\[Chatterbox\]\s*/, '');
+    console.error(`[Chatterbox] ${msg}`);
+  }
+}
+
 function rejectAllPending(err) {
   for (const [, { reject }] of pending) {
     reject(err);
@@ -85,10 +95,7 @@ function spawnWorker() {
     }
   });
 
-  proc.stderr.on('data', (d) => {
-    const text = d.toString();
-    if (text.trim()) console.error('[Chatterbox]', text.trim());
-  });
+  proc.stderr.on('data', (d) => logChatterboxStderr(d.toString()));
 
   proc.on('error', (err) => {
     rejectAllPending(err);
@@ -196,7 +203,7 @@ function runOneShotSynthesize({ text, outputWav, voice, exaggeration, cfgWeight 
     proc.stderr.on('data', (d) => {
       const t = d.toString();
       stderr += t;
-      if (t.trim()) console.error('[Chatterbox]', t.trim());
+      if (t.trim()) logChatterboxStderr(t);
     });
     proc.on('error', reject);
     proc.on('close', (code) => {

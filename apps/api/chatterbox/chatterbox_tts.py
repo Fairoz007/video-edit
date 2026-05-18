@@ -13,6 +13,10 @@ import json
 import os
 import sys
 import threading
+import warnings
+
+# diffusers LoRA deprecation — harmless until chatterbox-tts upgrades
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"diffusers(\..*)?")
 import traceback
 from pathlib import Path
 
@@ -206,6 +210,23 @@ def cmd_list_voices(_payload: dict) -> dict:
     }
 
 
+def cmd_setup() -> dict:
+    """Download / cache Hugging Face weights (run after pip install)."""
+    models_env = os.getenv("CHATTERBOX_SETUP_MODELS", "turbo").strip()
+    which = [m.strip().lower() for m in models_env.split(",") if m.strip()]
+    if not which:
+        which = ["turbo"]
+    engine = get_shared_engine()
+    warmed: list[str] = []
+    if "turbo" in which:
+        engine.get_turbo()
+        warmed.append("turbo")
+    if "multilingual" in which or "mtl" in which:
+        engine.get_mtl()
+        warmed.append("multilingual")
+    return {"ok": True, "device": engine.device, "warmed": warmed}
+
+
 def cmd_health(engine: ChatterboxEngine | None) -> dict:
     device = resolve_device()
     cuda = False
@@ -317,6 +338,11 @@ def main() -> int:
     parser.add_argument("--serve", action="store_true", help="JSON line daemon on stdin")
     parser.add_argument("--list-voices", action="store_true")
     parser.add_argument("--health", action="store_true")
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Download Chatterbox model weights (turbo by default; set CHATTERBOX_SETUP_MODELS)",
+    )
     parser.add_argument("--text", type=str)
     parser.add_argument("--voice", type=str)
     parser.add_argument("--output", type=str, help="Output .wav path")
@@ -329,6 +355,9 @@ def main() -> int:
         return 0
     if args.health:
         print(json.dumps(cmd_health(None)))
+        return 0
+    if args.setup:
+        print(json.dumps(cmd_setup()))
         return 0
     if args.text and args.output:
         return cli_synthesize(args)
