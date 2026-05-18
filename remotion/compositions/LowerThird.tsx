@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { displayFamily, interFamily } from '../lib/fonts';
 
 export interface LowerThirdProps {
   title: string;
@@ -10,7 +11,10 @@ export const LowerThird: React.FC<LowerThirdProps> = ({ title, subtitle }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const slide = spring({ frame, fps, config: { damping: 20 } });
-  const opacity = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(frame, [0, 8], [0, 1], {
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
 
   return (
     <div
@@ -36,7 +40,7 @@ export const LowerThird: React.FC<LowerThirdProps> = ({ title, subtitle }) => {
             color: '#fff',
             fontSize: 32,
             fontWeight: 700,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: displayFamily,
           }}
         >
           {title}
@@ -47,7 +51,7 @@ export const LowerThird: React.FC<LowerThirdProps> = ({ title, subtitle }) => {
               margin: '4px 0 0',
               color: '#e0e7ff',
               fontSize: 18,
-              fontFamily: 'Inter, system-ui, sans-serif',
+              fontFamily: interFamily,
             }}
           >
             {subtitle}

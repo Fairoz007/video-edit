@@ -11,6 +11,7 @@ import {
 } from '../constants/videoDefaults.js';
 import { generateScriptWithGroq, isGroqConfigured } from './groqScript.js';
 import { expandScriptSections } from './scriptLength.js';
+import { isValidHttpUrl, normalizeHttpUrl } from '../utils/urlValidate.js';
 
 const FALLBACK_SECTIONS = {
   intro: {
@@ -107,7 +108,21 @@ function sentenceChunks(text, max = 5) {
 }
 
 async function gatherResearchContext(input) {
-  const { topic, articleUrl, youtubeUrl } = input;
+  const { topic, youtubeUrl: rawYoutubeUrl } = input;
+  const articleUrl = normalizeHttpUrl(input.articleUrl);
+  const youtubeUrl = normalizeHttpUrl(rawYoutubeUrl);
+
+  if (input.articleUrl?.trim() && !articleUrl) {
+    console.warn(
+      `[Script] Ignoring invalid article URL (must start with http:// or https://): ${input.articleUrl.slice(0, 80)}`,
+    );
+  }
+  if (rawYoutubeUrl?.trim() && !youtubeUrl) {
+    console.warn(
+      `[Script] Ignoring invalid YouTube URL (must start with http:// or https://): ${rawYoutubeUrl.slice(0, 80)}`,
+    );
+  }
+
   let primaryTopic = topic || 'Untitled Documentary';
   let sourceText = '';
 

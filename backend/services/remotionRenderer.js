@@ -1,5 +1,5 @@
 /**
- * Remotion bundle + render — default documentary output with motion graphics.
+ * Remotion bundle + render — documentary & walkthrough compositions.
  */
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
@@ -10,6 +10,7 @@ import {
   TARGET_VIDEO_DURATION_SEC,
   REMOTION_INTRO_GRAPHIC_SEC,
   REMOTION_OUTRO_GRAPHIC_SEC,
+  WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 
@@ -20,11 +21,34 @@ function isAbsoluteAssetPath(src) {
   return path.isAbsolute(src) || /^[a-zA-Z]:\\/.test(src);
 }
 
+function copyAssetToPublic(src, publicDir, usedNames, index, fallbackExt = '.jpg') {
+  if (!src || src.startsWith('http://') || src.startsWith('https://')) {
+    return src;
+  }
+  if (!isAbsoluteAssetPath(src)) {
+    return src;
+  }
+  if (!fs.existsSync(src)) {
+    console.warn(`[Remotion] Missing asset: ${src}`);
+    return src;
+  }
+
+  const ext = path.extname(src) || fallbackExt;
+  let name = path.basename(src);
+  if (usedNames.has(name)) {
+    name = `asset-${index}${ext}`;
+  }
+  usedNames.add(name);
+
+  const dest = path.join(publicDir, name);
+  fs.copyFileSync(src, dest);
+  return name;
+}
+
 /**
- * Copy/symlink absolute media paths into a Remotion public dir and return relative names.
+ * Copy absolute media paths into a Remotion public dir and return relative names.
  */
-export function prepareRemotionPublicAssets(scenes, publicDir) {
-  // Fresh dir with real files — symlinks break Remotion's bundle HTTP server (404).
+export function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = []) {
   if (fs.existsSync(publicDir)) {
     fs.rmSync(publicDir, { recursive: true, force: true });
   }
@@ -34,91 +58,68 @@ export function prepareRemotionPublicAssets(scenes, publicDir) {
 
   const preparedScenes = (scenes || []).map((scene, i) => {
     const src = scene?.src;
-    if (!src || src.startsWith('http://') || src.startsWith('https://')) {
-      return scene;
-    }
-    if (!isAbsoluteAssetPath(src)) {
-      return scene;
-    }
-    if (!fs.existsSync(src)) {
-      console.warn(`[Remotion] Missing asset: ${src}`);
-      return scene;
-    }
-
-    const ext = path.extname(src) || '.jpg';
-    let name = path.basename(src);
-    if (usedNames.has(name)) {
-      name = `scene-${i}${ext}`;
-    }
-    usedNames.add(name);
-
-    const dest = path.join(publicDir, name);
-    fs.copyFileSync(src, dest);
-    copied++;
-
+    const name = copyAssetToPublic(src, publicDir, usedNames, i);
+    if (name !== src && isAbsoluteAssetPath(src)) copied++;
     return { ...scene, src: name };
   });
 
+  const preparedExtras = {};
+  for (const [key, src] of Object.entries(extraAssets)) {
+    if (!src) continue;
+    const name = copyAssetToPublic(src, publicDir, usedNames, copied);
+    if (name !== src && isAbsoluteAssetPath(src)) copied++;
+    preparedExtras[key] = name;
+  }
+
   console.log(`[Remotion] Prepared ${copied} asset(s) in ${publicDir}`);
-  return { publicDir, scenes: preparedScenes };
+  return { publicDir, scenes: preparedScenes, extras: preparedExtras };
 }
 
-export async function renderRemotionPreview(props, outputPath, options = {}) {
-  const entry = path.join(ROOT, 'remotion', 'index.ts');
-  if (!fs.existsSync(entry)) {
-    throw new Error('Remotion entry not found at remotion/index.ts');
-  }
+export function resolveCompositionId(project) {
+  const style = project?.input?.videoStyle || project?.videoStyle || 'documentary';
+  return style === 'walkthrough' ? 'Walkthrough' : 'Documentary';
+}
 
-  const publicDir =
-    options.publicDir || path.join(path.dirname(outputPath), 'remotion-public');
-  const { scenes } = prepareRemotionPublicAssets(props.scenes || [], publicDir);
-  const renderProps = { ...props, scenes };
+export function buildWalkthroughProps(project) {
+  const { script, media, walkthrough } = project;
+  const screens =
+    walkthrough?.screens?.map((s, i) => ({
+      id: s.id || `screen-${i}`,
+      title: s.title || `Screen ${i + 1}`,
+      description: s.description || '',
+      src: s.src || s.media?.localPath || s.media?.url || '',
+      duration: s.duration || WALKTHROUGH_SEC_PER_SCREEN,
+      transition: s.transition || ['fade', 'slide', 'fade', 'wipe'][i % 4],
+    })) ||
+    (media || []).slice(0, 16).map((m, i) => ({
+      id: `screen-${i}`,
+      title: script?.sections?.[i % (script?.sections?.length || 1)]?.title || `Screen ${i + 1}`,
+      description: script?.sections?.[i]?.narration?.slice(0, 120) || '',
+      src: m.localPath || m.url || '',
+      duration: WALKTHROUGH_SEC_PER_SCREEN,
+      transition: ['fade', 'slide', 'fade', 'wipe'][i % 4],
+    }));
 
-  const bundleLocation = await bundle({
-    entryPoint: entry,
-    rootDir: ROOT,
-    publicDir,
-    webpackOverride: (config) => config,
-  });
-
-  const composition = await selectComposition({
-    serveUrl: bundleLocation,
-    id: 'Documentary',
-    inputProps: renderProps,
-  });
-
-  let lastRemotionPct = -1;
-  await renderMedia({
-    composition,
-    serveUrl: bundleLocation,
-    codec: 'h264',
-    pixelFormat: 'yuv420p',
-    audioCodec: 'aac',
-    outputLocation: outputPath,
-    inputProps: renderProps,
-    chromiumOptions: { disableWebSecurity: true },
-    onProgress: ({ progress }) => {
-      const pct = Math.floor(progress * 100);
-      if (pct >= lastRemotionPct + 10 || pct === 100) {
-        lastRemotionPct = pct;
-        console.log(`[Remotion] ${pct}%`);
-      }
-    },
-  });
-
-  const ok = await verifyVideoFile(outputPath);
-  if (!ok) {
-    throw new Error('Remotion output is invalid or incomplete');
-  }
-
-  return outputPath;
+  return {
+    projectName: walkthrough?.projectName || script?.topic || 'Walkthrough',
+    screens: screens.filter((s) => s.src),
+    narrationAudioSrc: project.narration?.combinedPath || undefined,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+  };
 }
 
 export function buildRemotionProps(project) {
+  const compositionId = resolveCompositionId(project);
+  if (compositionId === 'Walkthrough') {
+    return buildWalkthroughProps(project);
+  }
+
   const { script, media, timeline } = project;
   const sectionById = Object.fromEntries((script?.sections || []).map((s) => [s.id, s]));
 
-  const transitions = ['crossfade', 'slide', 'zoom', 'fade'];
+  const transitions = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
   const scenes =
     timeline?.scenes?.map((s, i) => ({
       src: s.media?.localPath || s.media?.url || '',
@@ -145,8 +146,75 @@ export function buildRemotionProps(project) {
     introGraphicSec: REMOTION_INTRO_GRAPHIC_SEC,
     outroGraphicSec: REMOTION_OUTRO_GRAPHIC_SEC,
     channelName: process.env.CHANNEL_NAME || script?.topic || 'DocuForge',
+    narrationAudioSrc: project.narration?.combinedPath || undefined,
     fps: 30,
     width: 1920,
     height: 1080,
   };
+}
+
+export async function renderRemotionPreview(props, outputPath, options = {}) {
+  const entry = path.join(ROOT, 'remotion', 'index.ts');
+  if (!fs.existsSync(entry)) {
+    throw new Error('Remotion entry not found at remotion/index.ts');
+  }
+
+  const compositionId = options.compositionId || 'Documentary';
+  const isWalkthrough = compositionId === 'Walkthrough';
+  const publicDir =
+    options.publicDir || path.join(path.dirname(outputPath), 'remotion-public');
+
+  const scenesOrScreens = isWalkthrough ? props.screens || [] : props.scenes || [];
+  const { scenes, extras } = prepareRemotionPublicAssets(
+    scenesOrScreens,
+    publicDir,
+    props.narrationAudioSrc
+      ? { narration: props.narrationAudioSrc }
+      : {},
+  );
+
+  const renderProps = {
+    ...props,
+    ...(isWalkthrough ? { screens: scenes } : { scenes }),
+    narrationAudioSrc: extras.narration || props.narrationAudioSrc,
+  };
+
+  const bundleLocation = await bundle({
+    entryPoint: entry,
+    rootDir: ROOT,
+    publicDir,
+    webpackOverride: (config) => config,
+  });
+
+  const composition = await selectComposition({
+    serveUrl: bundleLocation,
+    id: compositionId,
+    inputProps: renderProps,
+  });
+
+  let lastRemotionPct = -1;
+  await renderMedia({
+    composition,
+    serveUrl: bundleLocation,
+    codec: 'h264',
+    pixelFormat: 'yuv420p',
+    audioCodec: 'aac',
+    outputLocation: outputPath,
+    inputProps: renderProps,
+    chromiumOptions: { disableWebSecurity: true },
+    onProgress: ({ progress }) => {
+      const pct = Math.floor(progress * 100);
+      if (pct >= lastRemotionPct + 10 || pct === 100) {
+        lastRemotionPct = pct;
+        console.log(`[Remotion:${compositionId}] ${pct}%`);
+      }
+    },
+  });
+
+  const ok = await verifyVideoFile(outputPath);
+  if (!ok) {
+    throw new Error('Remotion output is invalid or incomplete');
+  }
+
+  return outputPath;
 }

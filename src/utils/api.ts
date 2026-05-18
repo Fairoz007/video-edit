@@ -74,12 +74,16 @@ export const getRenderStatus = (projectId: string) =>
 export const getQueue = () => api.get('/queue');
 export const addToQueue = (job: object) => api.post('/queue/add', job);
 
+export type VideoStyle = 'documentary' | 'walkthrough';
+
 export interface DocumentaryInput {
   topic?: string;
   articleUrl?: string;
   youtubeUrl?: string;
   voice?: string;
   rate?: number;
+  videoStyle?: VideoStyle;
+  templateId?: string;
 }
 
 export interface ExportOptions {

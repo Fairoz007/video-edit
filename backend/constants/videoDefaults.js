@@ -24,3 +24,10 @@ export const MIN_NARRATION_WORDS = Math.round(
 export const MIN_IMAGE_WIDTH = parseInt(process.env.MIN_IMAGE_WIDTH || '1920', 10);
 
 export const SCRIPT_SECTION_IDS = ['intro', 'history', 'growth', 'modern', 'outro'];
+
+/** Walkthrough / Stitch-style screen pacing (seconds per slide). */
+export const WALKTHROUGH_SEC_PER_SCREEN = parseFloat(
+  process.env.WALKTHROUGH_SEC_PER_SCREEN || '4',
+);
+
+export const VIDEO_STYLES = ['documentary', 'walkthrough'];

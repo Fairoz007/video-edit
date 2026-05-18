@@ -32,17 +32,39 @@ export function TopicInput() {
 
   useRenderPolling(projectId, status === 'rendering');
 
+  const isValidUrl = (value?: string) => {
+    if (!value?.trim()) return true;
+    try {
+      const u = new URL(value.trim());
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const handleGenerate = async () => {
+    const urlField = tab === 'article' ? input.articleUrl : tab === 'youtube' ? input.youtubeUrl : undefined;
+    if (urlField?.trim() && !isValidUrl(urlField)) {
+      setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
+      return;
+    }
+
     setLoading(true);
     setStatus('generating');
     try {
-      const { data: script } = await generateScript(input);
+      const { data: script } = await generateScript({
+        ...input,
+        articleUrl: input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
+        youtubeUrl: input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
+      });
       setScript(script);
       const { data: kw } = await extractKeywords({
         text: script.fullNarration,
         topic: input.topic || script.topic,
-        articleUrl: input.articleUrl,
-        youtubeUrl: input.youtubeUrl,
+        articleUrl:
+          input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
+        youtubeUrl:
+          input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
       });
       setKeywords(kw);
     } catch (err) {
@@ -58,6 +80,10 @@ export function TopicInput() {
 
   const handleScrapeMedia = async () => {
     if (!sourceUrl) return;
+    if (!isValidUrl(sourceUrl)) {
+      setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
+      return;
+    }
     setScraping(true);
     setScrapeInfo(null);
     try {
@@ -77,11 +103,19 @@ export function TopicInput() {
   };
 
   const handleRender = async () => {
+    const urlField = tab === 'article' ? input.articleUrl : tab === 'youtube' ? input.youtubeUrl : undefined;
+    if (urlField?.trim() && !isValidUrl(urlField)) {
+      setScrapeInfo('Enter a valid http:// or https:// URL (not .env text or comments).');
+      return;
+    }
+
     setStatus('rendering');
     try {
       const { data } = await startRender({
         input: {
           ...input,
+          articleUrl: input.articleUrl?.trim() && isValidUrl(input.articleUrl) ? input.articleUrl.trim() : undefined,
+          youtubeUrl: input.youtubeUrl?.trim() && isValidUrl(input.youtubeUrl) ? input.youtubeUrl.trim() : undefined,
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
         },

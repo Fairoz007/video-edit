@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { displayFamily, interFamily } from '../lib/fonts';
 
 export interface IntroGraphicProps {
   title: string;
@@ -12,7 +13,10 @@ export const IntroGraphic: React.FC<IntroGraphicProps> = ({ title, subtitle }) =
 
   const titleSpring = spring({ frame, fps, config: { damping: 18, stiffness: 80 } });
   const lineWidth = interpolate(frame, [10, 40], [0, 320], { extrapolateRight: 'clamp' });
-  const subtitleOpacity = interpolate(frame, [25, 45], [0, 1], { extrapolateRight: 'clamp' });
+  const subtitleOpacity = interpolate(frame, [25, 45], [0, 1], {
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
 
   return (
     <AbsoluteFill
@@ -65,7 +69,7 @@ export const IntroGraphic: React.FC<IntroGraphicProps> = ({ title, subtitle }) =
             letterSpacing: 8,
             textTransform: 'uppercase',
             marginBottom: 20,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: interFamily,
             opacity: subtitleOpacity,
           }}
         >
@@ -77,7 +81,7 @@ export const IntroGraphic: React.FC<IntroGraphicProps> = ({ title, subtitle }) =
             fontWeight: 800,
             margin: 0,
             lineHeight: 1.05,
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: displayFamily,
             maxWidth: 1400,
             padding: '0 48px',
             background: 'linear-gradient(90deg, #e0e7ff, #c4b5fd, #f0abfc)',

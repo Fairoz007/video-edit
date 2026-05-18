@@ -12,11 +12,12 @@ import { generateDocumentaryScript } from './scriptGenerator.js';
 import { generateNarrationForTargetDuration } from './voiceGenerator.js';
 import { REMOTION_INTRO_GRAPHIC_SEC } from '../constants/videoDefaults.js';
 import { writeSubtitles } from './subtitleGenerator.js';
-import { buildTimeline } from './timelineBuilder.js';
+import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
 import { buildRemotionProps, renderRemotionPreview } from './remotionRenderer.js';
 import { exportDocumentary } from './videoRenderer.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { normalizeHttpUrl } from '../utils/urlValidate.js';
 
 export class RenderPipeline {
   constructor(root) {
@@ -58,7 +59,9 @@ export class RenderPipeline {
       fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
 
       // 2. Playwright scrape (article / YouTube) — content + media for keywords & timeline
-      const sourceUrl = project.input?.articleUrl || project.input?.youtubeUrl;
+      const sourceUrl =
+        normalizeHttpUrl(project.input?.articleUrl) ||
+        normalizeHttpUrl(project.input?.youtubeUrl);
       let scrapedMedia = [];
       let scrapedContent = null;
       if (sourceUrl) {
@@ -130,18 +133,45 @@ export class RenderPipeline {
       });
       project.subtitleCues = cues;
 
-      // 6. Timeline — sync to real narration length
-      report('timeline', 50, 'Building 3:00 timeline...');
-      const timeline = buildTimeline(script, manifest, tracks, { audioDurationSec });
+      const videoStyle = project.input?.videoStyle || 'documentary';
+      project.videoStyle = videoStyle;
+
+      // 6. Timeline — documentary or walkthrough (Stitch-style slides)
+      report('timeline', 50, `Building ${videoStyle} timeline...`);
+      let timeline;
+      let walkthrough;
+      if (videoStyle === 'walkthrough') {
+        walkthrough = buildWalkthroughTimeline(script, manifest, { audioDurationSec });
+        project.walkthrough = walkthrough;
+        timeline = {
+          scenes: walkthrough.screens.map((s) => ({
+            id: s.id,
+            duration: s.duration,
+            media: { localPath: s.src, type: s.type },
+            transition: s.transition,
+          })),
+          totalDuration: walkthrough.totalDuration,
+        };
+      } else {
+        timeline = buildTimeline(script, manifest, tracks, { audioDurationSec });
+      }
       project.timeline = timeline;
       fs.mkdirSync(path.join(dir, 'timeline'), { recursive: true });
       fs.writeFileSync(path.join(dir, 'timeline', 'timeline.json'), JSON.stringify(timeline, null, 2));
+      if (walkthrough) {
+        fs.writeFileSync(
+          path.join(dir, 'timeline', 'walkthrough.json'),
+          JSON.stringify(walkthrough, null, 2),
+        );
+      }
 
-      // 7. Remotion — default renderer (intro/outro graphics, lower thirds)
-      report('remotion', 55, 'Rendering with Remotion motion graphics...');
+      // 7. Remotion — TransitionSeries, walkthrough slides, motion graphics
+      const compositionId = videoStyle === 'walkthrough' ? 'Walkthrough' : 'Documentary';
+      report('remotion', 55, `Rendering with Remotion (${compositionId})...`);
       const remotionProps = buildRemotionProps({
         ...project,
         timeline,
+        walkthrough,
         subtitleCues: project.subtitleCues,
       });
       let videoPath = path.join(dir, 'renders', 'remotion-output.mp4');
@@ -149,6 +179,7 @@ export class RenderPipeline {
       try {
         await renderRemotionPreview(remotionProps, videoPath, {
           publicDir: path.join(dir, 'remotion-public'),
+          compositionId,
         });
       } catch (err) {
         console.warn('[Pipeline] Remotion failed, falling back to MoviePy:', err.message);

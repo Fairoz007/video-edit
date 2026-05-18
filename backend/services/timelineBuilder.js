@@ -5,6 +5,7 @@ import {
   TARGET_VIDEO_DURATION_SEC,
   REMOTION_INTRO_GRAPHIC_SEC,
   REMOTION_OUTRO_GRAPHIC_SEC,
+  WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
 
 const CONTENT_DURATION =
@@ -81,5 +82,41 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
       audio: audioTracks || [],
       subtitles: script.sections,
     },
+  };
+}
+
+const WALKTHROUGH_TRANSITIONS = ['fade', 'slide', 'fade', 'wipe'];
+
+/**
+ * Walkthrough timeline — one slide per media asset with Stitch-style pacing.
+ */
+export function buildWalkthroughTimeline(script, mediaManifest, options = {}) {
+  const secPerScreen = options.secPerScreen || WALKTHROUGH_SEC_PER_SCREEN;
+  const pool = (mediaManifest || []).filter((m) => m.localPath || m.url);
+  const sections = script?.sections || [];
+  const maxScreens = options.maxScreens || 16;
+  const assets = pool.slice(0, maxScreens);
+
+  const screens = assets.map((asset, i) => {
+    const section = sections[i % Math.max(1, sections.length)];
+    return {
+      id: `screen-${i}`,
+      title: section?.title || asset.title || `Screen ${i + 1}`,
+      description: section?.narration?.slice(0, 120) || asset.alt || '',
+      src: asset.localPath || asset.url,
+      type: asset.type || 'image',
+      duration: secPerScreen,
+      transition: WALKTHROUGH_TRANSITIONS[i % WALKTHROUGH_TRANSITIONS.length],
+    };
+  });
+
+  const totalDuration = screens.reduce((a, s) => a + s.duration, 0) || secPerScreen;
+
+  return {
+    screens,
+    totalDuration,
+    fps: 30,
+    style: 'walkthrough',
+    projectName: script?.topic || 'Walkthrough',
   };
 }

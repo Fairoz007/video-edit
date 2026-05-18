@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { displayFamily } from '../lib/fonts';
 
 export interface SubtitleCue {
   text: string;
@@ -49,7 +50,11 @@ export const AnimatedSubtitle: React.FC<AnimatedSubtitleProps> = ({ cues }) => {
     localFrame,
     [0, 6, durationFrames - 8, durationFrames],
     [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+    {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: Easing.bezier(0.45, 0, 0.55, 1),
+    },
   );
   const scale = interpolate(bounce, [0, 1], [0.88, 1], { extrapolateRight: 'clamp' });
 
@@ -86,7 +91,7 @@ export const AnimatedSubtitle: React.FC<AnimatedSubtitleProps> = ({ cues }) => {
             lineHeight: 1.35,
             whiteSpace: 'pre-line',
             textAlign: 'center',
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: displayFamily,
             textShadow: '0 2px 8px rgba(0,0,0,0.6)',
           }}
         >
