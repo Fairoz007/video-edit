@@ -1,6 +1,10 @@
 import { Clapperboard } from 'lucide-react';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import type { EditMode, VideoStyle } from '../../utils/api';
+import {
+  DEFAULT_TEMPLATE_ID,
+  DOCUMENTARY_VISUAL_TEMPLATES,
+} from '../../constants/documentaryTemplates';
 
 const EDIT_MODES: { id: EditMode; label: string; hint: string }[] = [
   {
@@ -28,8 +32,6 @@ const VIDEO_STYLES: { id: VideoStyle; label: string; hint: string }[] = [
   },
 ];
 
-const THEMES = ['Cinematic', 'Modern Dark', 'Broadcast', 'Noir'];
-const INTROS = ['Epic Reveal', 'Minimal Fade', 'Title Card', 'None'];
 
 export function DocumentarySettings() {
   const { script, input, setInput } = useProjectStore();
@@ -77,19 +79,26 @@ export function DocumentarySettings() {
         ))}
       </select>
 
-      <label className="block text-[10px] text-gray-500 mb-1">Theme</label>
-      <select className="input-field text-xs mb-2.5 w-full">
-        {THEMES.map((t) => (
-          <option key={t}>{t}</option>
+      <label className="block text-[10px] text-gray-500 mb-1">Visual template</label>
+      <select
+        className="input-field text-xs mb-2.5 w-full"
+        value={input.templateId || DEFAULT_TEMPLATE_ID}
+        disabled={input.videoStyle === 'walkthrough'}
+        onChange={(e) =>
+          setInput({ templateId: e.target.value, videoStyle: 'documentary' })
+        }
+      >
+        {DOCUMENTARY_VISUAL_TEMPLATES.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+            {t.id === DEFAULT_TEMPLATE_ID ? ' (default)' : ''}
+          </option>
         ))}
       </select>
-
-      <label className="block text-[10px] text-gray-500 mb-1">Intro / Outro</label>
-      <select className="input-field text-xs w-full">
-        {INTROS.map((i) => (
-          <option key={i}>{i}</option>
-        ))}
-      </select>
+      <p className="text-[9px] text-gray-600 mb-2.5 -mt-1">
+        {DOCUMENTARY_VISUAL_TEMPLATES.find((t) => t.id === (input.templateId || DEFAULT_TEMPLATE_ID))
+          ?.description || 'Choose a look in Templates sidebar for previews.'}
+      </p>
 
       {script && (
         <p className="mt-2.5 text-[10px] text-forge-cyan/70 pt-2 border-t border-forge-border/30">

@@ -11,12 +11,17 @@ import {
 } from '../services/voicePreviewCache.js';
 import { writeSubtitles } from '../services/subtitleGenerator.js';
 import { buildTimeline } from '../services/timelineBuilder.js';
+import { listDocumentaryTemplates } from '@docuforge/config/documentaryTemplates';
 import { projectDir } from '../utils/paths.js';
 import fs from 'fs';
 import path from 'path';
 
 export function createPipelineRouter(root) {
   const router = Router();
+
+  router.get('/templates', (_req, res) => {
+    res.json({ templates: listDocumentaryTemplates(), defaultId: 'template_cinematic_docuforge' });
+  });
 
   router.post('/script', async (req, res) => {
     try {

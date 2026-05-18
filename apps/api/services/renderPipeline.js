@@ -20,6 +20,10 @@ import {
   balanceSectionDurations,
   syncSectionDurationsFromAudio,
 } from '../utils/sectionTiming.js';
+import {
+  getDocumentaryTemplate,
+  resolveVisualTheme,
+} from '@docuforge/config/documentaryTemplates';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValidate.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
@@ -209,10 +213,15 @@ export class RenderPipeline {
           totalDuration: walkthrough.totalDuration,
         };
       } else {
+        const docTemplate = getDocumentaryTemplate(project.input?.templateId);
+        const visualTheme = resolveVisualTheme(docTemplate);
+        project.visualTemplate = docTemplate;
         timeline = buildTimeline(script, manifest, tracks, {
           audioDurationSec,
           videoOnly,
           editMode: project.input?.editMode,
+          templateId: docTemplate.id,
+          visualTheme,
         });
         if (timeline.sections?.length) {
           script.sections = timeline.sections;

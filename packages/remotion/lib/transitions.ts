@@ -8,11 +8,40 @@ export type TransitionKind = 'fade' | 'crossfade' | 'slide' | 'zoom' | 'wipe' | 
 
 const TRANSITION_DURATION = 20;
 
-export function transitionTiming(kind: TransitionKind): TransitionTiming {
+export function transitionTiming(
+  kind: TransitionKind,
+  durationInFrames: number = TRANSITION_DURATION,
+): TransitionTiming {
+  const frames = Math.max(4, durationInFrames);
   if (kind === 'zoom' || kind === 'slide') {
-    return springTiming({ config: { damping: 200 }, durationInFrames: TRANSITION_DURATION });
+    return springTiming({ config: { damping: 200 }, durationInFrames: frames });
   }
-  return linearTiming({ durationInFrames: TRANSITION_DURATION });
+  return linearTiming({ durationInFrames: frames });
+}
+
+export function mapTemplateTransitionType(type: string): TransitionKind {
+  switch (type) {
+    case 'wipe':
+    case 'iris_wipe':
+    case 'glitch_slide':
+    case 'smash_cut':
+      return 'wipe';
+    case 'slide':
+      return 'slide';
+    case 'zoom':
+    case 'zoom_through':
+      return 'zoom';
+    case 'fade':
+    case 'fade_through_black':
+    case 'fade_through_warm_white':
+    case 'cross_dissolve_slow':
+    case 'cross_dissolve_long':
+      return 'fade';
+    case 'crossfade':
+    case 'cross_dissolve':
+    default:
+      return 'crossfade';
+  }
 }
 
 export function transitionPresentation(kind: TransitionKind) {

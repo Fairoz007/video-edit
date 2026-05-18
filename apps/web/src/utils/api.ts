@@ -33,6 +33,18 @@ export const extractKeywords = (payload: {
 }) => api.post('/pipeline/keywords', payload);
 export const buildTimeline = (data: object) => api.post('/pipeline/timeline', data);
 
+export interface DocumentaryTemplateMeta {
+  id: string;
+  name: string;
+  description: string;
+  style: string;
+}
+
+export const listDocumentaryTemplates = () =>
+  api.get<{ templates: DocumentaryTemplateMeta[]; defaultId: string }>(
+    '/pipeline/templates',
+  );
+
 export interface SystemVoice {
   id: string;
   name: string;

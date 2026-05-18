@@ -8,6 +8,7 @@ import {
   useVideoConfig,
 } from 'remotion';
 import { displayFamily, interFamily } from '../lib/fonts';
+import { useVisualTemplate } from '../lib/visualTemplate';
 
 export interface OutroGraphicProps {
   channelName?: string;
@@ -19,12 +20,14 @@ function CtaButton({
   accent,
   delay,
   phaseOffset = 0,
+  outline = false,
 }: {
   icon: string;
   label: string;
   accent: string;
   delay: number;
   phaseOffset?: number;
+  outline?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -35,10 +38,6 @@ function CtaButton({
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 12,
         opacity: Math.max(0, enter),
         transform: `translateY(${slideY}px) scale(${Math.max(0, enter) * pulse})`,
       }}
@@ -47,12 +46,13 @@ function CtaButton({
         style={{
           padding: '14px 28px',
           borderRadius: 12,
-          background: accent,
+          background: outline ? 'transparent' : accent,
+          border: outline ? `2px solid ${accent}` : undefined,
           fontSize: 22,
           fontWeight: 600,
-          color: '#fff',
+          color: outline ? accent : '#fff',
           fontFamily: interFamily,
-          boxShadow: `0 8px 32px ${accent}66`,
+          boxShadow: outline ? 'none' : `0 8px 32px ${accent}66`,
         }}
       >
         {icon} {label}
@@ -62,6 +62,8 @@ function CtaButton({
 }
 
 export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuForge' }) => {
+  const theme = useVisualTemplate();
+  const outro = theme.outro;
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -72,48 +74,53 @@ export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuF
   });
   const brandEnter = spring({ frame: frame - 20, fps, config: { damping: 14, stiffness: 90 } });
   const brandScale = interpolate(brandEnter, [0, 1], [0.85, 1]);
-
   const endFade = interpolate(
     frame,
     [durationInFrames - 25, durationInFrames],
-    [1, 0.85],
+    [1, outro.style === 'fade_to_black_title_card' ? 0.95 : 0.85],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
+
+  const outlineCtas =
+    outro.style === 'warm_editorial_close' || outro.style === 'fade_to_black_title_card';
+  const showParticles = outro.style === 'neon_endcard' || outro.style === 'cinematic_cta';
+  const thanksColor = outro.style === 'warm_editorial_close' ? theme.palette.muted : theme.palette.muted;
 
   return (
     <AbsoluteFill
       style={{
-        background: 'radial-gradient(ellipse at center, #0F0A1E 0%, #12101f 55%, #000000 100%)',
+        background: outro.bg,
         justifyContent: 'center',
         alignItems: 'center',
         opacity: endFade,
       }}
     >
-      {Array.from({ length: 20 }, (_, i) => {
-        const x = 10 + ((i * 97) % 80);
-        const y = 15 + ((i * 53) % 70);
-        const drift = Math.sin((frame + i * 12) / 45) * 8;
-        return (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${x}%`,
-              top: `${y + drift * 0.1}%`,
-              width: 8 + (i % 4) * 2,
-              height: 8 + (i % 4) * 2,
-              borderRadius: '50%',
-              background: `rgba(124,58,237,${0.15 + (i % 3) * 0.08})`,
-              filter: 'blur(1px)',
-            }}
-          />
-        );
-      })}
+      {showParticles &&
+        Array.from({ length: 20 }, (_, i) => {
+          const x = 10 + ((i * 97) % 80);
+          const y = 15 + ((i * 53) % 70);
+          const drift = Math.sin((frame + i * 12) / 45) * 8;
+          return (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `${x}%`,
+                top: `${y + drift * 0.1}%`,
+                width: 8 + (i % 4) * 2,
+                height: 8 + (i % 4) * 2,
+                borderRadius: '50%',
+                background: `color-mix(in srgb, ${theme.palette.primary} ${15 + (i % 3) * 8}%, transparent)`,
+                filter: 'blur(1px)',
+              }}
+            />
+          );
+        })}
 
       <div style={{ textAlign: 'center' }}>
         <p
           style={{
-            color: '#94A3B8',
+            color: thanksColor,
             fontSize: 20,
             letterSpacing: 3,
             marginBottom: 16,
@@ -126,12 +133,13 @@ export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuF
         </p>
         <h2
           style={{
-            color: '#fff',
-            fontSize: 64,
+            color: theme.palette.text,
+            fontSize: outro.style === 'warm_editorial_close' ? 56 : 64,
             fontWeight: 700,
             margin: '0 0 48px',
             fontFamily: displayFamily,
-            letterSpacing: 10,
+            letterSpacing: outro.style === 'warm_editorial_close' ? 4 : 10,
+            fontStyle: outro.style === 'warm_editorial_close' ? 'italic' : 'normal',
             opacity: Math.max(0, brandEnter),
             transform: `scale(${brandScale})`,
           }}
@@ -139,8 +147,21 @@ export const OutroGraphic: React.FC<OutroGraphicProps> = ({ channelName = 'DocuF
           {channelName}
         </h2>
         <div style={{ display: 'flex', gap: 40, justifyContent: 'center' }}>
-          <CtaButton icon="🔔" label="Subscribe" accent="#7C3AED" delay={35} />
-          <CtaButton icon="👍" label="Like" accent="#EC4899" delay={42} phaseOffset={30} />
+          <CtaButton
+            icon="🔔"
+            label="Subscribe"
+            accent={outro.ctaSubscribe}
+            delay={35}
+            outline={outlineCtas}
+          />
+          <CtaButton
+            icon="👍"
+            label="Like"
+            accent={outro.ctaLike}
+            delay={42}
+            phaseOffset={30}
+            outline={outlineCtas}
+          />
         </div>
       </div>
     </AbsoluteFill>

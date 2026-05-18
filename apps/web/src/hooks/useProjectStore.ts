@@ -32,7 +32,11 @@ export interface ProjectState {
   reset: () => void;
 }
 
-const defaultInput: DocumentaryInput = { topic: '' };
+const defaultInput: DocumentaryInput = {
+  topic: '',
+  videoStyle: 'documentary',
+  templateId: 'template_cinematic_docuforge',
+};
 
 export const useProjectStore = create<ProjectState>((set) => ({
   projectId: null,

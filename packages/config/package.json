@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./repoRoot": "./repoRoot.js"
+    "./repoRoot": "./repoRoot.js",
+    "./documentaryTemplates": "./documentaryTemplates.js"
   }
 }

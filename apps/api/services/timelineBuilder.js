@@ -17,7 +17,6 @@ const COLOR_GRADES = ['warm_golden', 'cool_blue', 'cinematic_teal_orange', 'warm
 const CONTENT_DURATION =
   TARGET_VIDEO_DURATION_SEC - REMOTION_INTRO_GRAPHIC_SEC - REMOTION_OUTRO_GRAPHIC_SEC;
 
-const TRANSITIONS = ['crossfade', 'crossfade', 'wipe', 'slide'];
 
 function expandMediaPool(manifest, minClips) {
   if (!manifest.length) return [];
@@ -29,9 +28,29 @@ function expandMediaPool(manifest, minClips) {
   return out;
 }
 
+function transitionListForTemplate(visualTheme) {
+  const t = visualTheme?.transitions?.defaultType || 'crossfade';
+  if (t === 'wipe' || t === 'smash_cut') return ['wipe', 'wipe', 'crossfade', 'slide'];
+  if (t === 'fade') return ['fade', 'fade', 'crossfade', 'fade'];
+  return ['crossfade', 'crossfade', 'wipe', 'slide'];
+}
+
+function maxClipsForTemplate(templateId) {
+  if (templateId === 'template_hype_sports') return 3;
+  if (templateId === 'template_premium_longform') return 1;
+  return 2;
+}
+
 export function buildTimeline(script, mediaManifest, audioTracks, options = {}) {
   const videoOnly =
     options.videoOnly === true || options.editMode === 'video-only';
+  const visualTheme = options.visualTheme || null;
+  const templateId = options.templateId || 'template_cinematic_docuforge';
+  const TRANSITIONS = transitionListForTemplate(visualTheme);
+  const maxClipsPerSection = maxClipsForTemplate(templateId);
+  const globalLut = visualTheme?.globalLut || 'cinematic_teal_orange';
+  const kenBurnsFrom = visualTheme?.bgEffects?.scaleMin ?? 1.0;
+  const kenBurnsTo = visualTheme?.bgEffects?.scaleMax ?? 1.08;
   const sectionCount = Math.max(1, script.sections.length);
   const audioDurationSec = videoOnly ? null : options.audioDurationSec;
 
@@ -61,9 +80,9 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   for (let i = 0; i < sectionCount; i++) {
     const section = balancedSections[i];
     const sectionDuration = sectionDurations[i] * scale;
-    const clipCount = Math.min(2, mediaPerSection, pool.length);
+    const clipCount = Math.min(maxClipsPerSection, mediaPerSection, pool.length);
     const clipDuration = sectionDuration / clipCount;
-    const colorGrade = COLOR_GRADES[i % COLOR_GRADES.length];
+    const colorGrade = globalLut || COLOR_GRADES[i % COLOR_GRADES.length];
     const isFirstSectionScene = (j) => j === 0;
 
     for (let j = 0; j < clipCount; j++) {
@@ -100,6 +119,8 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
                 }
               : undefined,
         chapterBadgeLabel: isFirstSectionScene(j) ? section.title : undefined,
+        kenBurnsFrom,
+        kenBurnsTo,
       });
       timeCursor += duration;
     }

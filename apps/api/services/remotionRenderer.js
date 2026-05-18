@@ -12,6 +12,10 @@ import {
   REMOTION_OUTRO_GRAPHIC_SEC,
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
+import {
+  getDocumentaryTemplate,
+  resolveVisualTheme,
+} from '@docuforge/config/documentaryTemplates';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
 
@@ -143,8 +147,10 @@ export function buildRemotionProps(project) {
   const sectionById = Object.fromEntries((script?.sections || []).map((s) => [s.id, s]));
 
   const transitions = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
-  const introSec = REMOTION_INTRO_GRAPHIC_SEC;
+  const template = getDocumentaryTemplate(project.input?.templateId);
+  const visualTheme = resolveVisualTheme(template);
   const fps = 30;
+  const introSec = visualTheme.intro.durationFrames / fps;
 
   const scenes =
     timeline?.scenes?.map((s, i) => ({
@@ -157,8 +163,8 @@ export function buildRemotionProps(project) {
       sectionIndex: s.sectionIndex ?? 0,
       colorGrade: s.colorGrade,
       lowerThird: s.lowerThird,
-      kenBurnsFrom: s.sectionIndex % 2 === 0 ? 1.06 : 1.05,
-      kenBurnsTo: 1,
+      kenBurnsFrom: s.kenBurnsFrom ?? visualTheme.bgEffects.scaleMin,
+      kenBurnsTo: s.kenBurnsTo ?? visualTheme.bgEffects.scaleMax,
       panStartX: s.sectionIndex % 2 === 0 ? 0 : 20,
       panEndX: s.sectionIndex % 2 === 0 ? -20 : 0,
     })) ||
@@ -179,6 +185,8 @@ export function buildRemotionProps(project) {
     subtitleCues: project.subtitleCues || [],
     wordCues: project.wordCues || [],
     chapterBadges,
+    visualTheme,
+    templateId: template.id,
     totalDuration: timeline?.totalDuration || TARGET_VIDEO_DURATION_SEC,
     introGraphicSec: introSec,
     outroGraphicSec: REMOTION_OUTRO_GRAPHIC_SEC,
