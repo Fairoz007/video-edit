@@ -3,6 +3,8 @@
  */
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { findFfmpegPath } from '../utils/ffmpegPath.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 
@@ -63,7 +65,11 @@ export async function exportDocumentary({
   if (!fs.existsSync(narrationPath)) throw new Error(`Narration not found: ${narrationPath}`);
 
   const { w, h } = RESOLUTIONS[preset] || RESOLUTIONS['1080p'];
-  const tempPath = `${outputPath}.part`;
+  // FFmpeg needs a .mp4 extension (or explicit -f mp4) — ".mp4.part" breaks format detection.
+  const tempPath = path.join(
+    os.tmpdir(),
+    `docuforge-export-${Date.now()}-${path.basename(outputPath).replace(/[^\w.-]/g, '_')}`,
+  );
   if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
   const vf = scalePadFilter(w, h, cinematic);
@@ -113,6 +119,7 @@ export async function exportDocumentary({
     if (bin) cmd.setFfmpegPath(bin);
 
     cmd
+      .format('mp4')
       .output(tempPath)
       .on('end', async () => {
         try {
