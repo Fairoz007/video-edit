@@ -14,13 +14,17 @@ export function MusicControls() {
         Music & Audio
       </h3>
 
-      <label className="block text-[10px] text-gray-500 mb-1">Background track</label>
+      <p className="text-xs text-forge-text-secondary mb-2 leading-relaxed">
+        A track from the project <span className="text-forge-text">music/</span> folder is mixed
+        automatically on every export at low volume under narration.
+      </p>
+      <label className="block text-[10px] text-forge-muted mb-1">Override track (optional)</label>
       <button
         type="button"
-        className="w-full mb-2.5 py-2 rounded-xl border border-dashed border-forge-border/50 text-[10px] text-gray-400 hover:text-white flex items-center justify-center gap-1.5 transition-all"
+        className="w-full mb-2.5 py-2 rounded-studio border border-dashed border-forge-border text-[10px] text-forge-text-secondary hover:text-forge-text flex items-center justify-center gap-1.5 transition-all"
       >
         <Upload className="w-3 h-3" />
-        Upload audio
+        Upload custom audio
       </button>
 
       <label className="block text-[10px] text-gray-500 mb-1">EQ Preset</label>

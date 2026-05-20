@@ -14,7 +14,7 @@ import { normalizeMediaList } from '../utils/mediaUrl';
 import { isValidHttpUrl, normalizeHttpUrlInput } from '../utils/urls';
 import { useProjectStore } from './useProjectStore';
 
-export type InputTab = 'topic' | 'article' | 'youtube';
+export type InputTab = 'topic' | 'article' | 'youtube' | 'script';
 
 function formatApiError(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -30,6 +30,12 @@ export function useDocumentaryPipeline() {
 
   const validateInput = useCallback(
     (tab: InputTab): string | null => {
+      if (tab === 'script') {
+        if (!store.input.scriptText?.trim()) {
+          return 'Upload a .txt script or paste content from the demo template.';
+        }
+        return null;
+      }
       if (tab === 'topic') {
         if (!store.input.topic?.trim()) return 'Enter a documentary topic.';
         return null;
@@ -186,15 +192,20 @@ export function useDocumentaryPipeline() {
   );
 
   const startRenderFlow = useCallback(async () => {
-    const tab: InputTab = store.input.youtubeUrl
-      ? 'youtube'
-      : store.input.articleUrl
-        ? 'article'
-        : 'topic';
-    const err = validateInput(tab);
-    if (err) {
-      store.setError(err);
-      return;
+    const state = useProjectStore.getState();
+    if (!state.script) {
+      const tab: InputTab = state.input.scriptText?.trim()
+        ? 'script'
+        : state.input.youtubeUrl
+          ? 'youtube'
+          : state.input.articleUrl
+            ? 'article'
+            : 'topic';
+      const err = validateInput(tab);
+      if (err) {
+        store.setError(err);
+        return;
+      }
     }
 
     store.setError(null);

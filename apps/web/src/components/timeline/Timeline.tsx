@@ -1,19 +1,25 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { GlassPanel } from '../ui/GlassPanel';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { TimelineToolbar } from './TimelineToolbar';
 import { TimelineTrack } from './TimelineTrack';
+import { TimelineEmptyState } from './TimelineEmptyState';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { buildNarrationTrackItems, isVideoOnlyEditMode } from '../../utils/timelineSync';
+import { useUiStore } from '../../hooks/useUiStore';
 
 export function Timeline() {
   const { timeline, script, input } = useProjectStore();
+  const { timelineExpanded, toggleTimeline } = useUiStore();
   const videoOnly = isVideoOnlyEditMode(input.editMode);
   const [zoom, setZoom] = useState(1);
   const [playhead, setPlayhead] = useState(0);
 
   const scenes = timeline?.scenes ?? [];
-  const totalDuration = timeline?.totalDuration || (script?.sections.reduce((a, s) => a + s.durationEstimate, 0) ?? 0) || 120;
+  const totalDuration =
+    timeline?.totalDuration ||
+    (script?.sections.reduce((a, s) => a + s.durationEstimate, 0) ?? 0) ||
+    120;
   const playheadPercent = totalDuration ? (playhead / totalDuration) * 100 : 0;
 
   const videoItems =
@@ -23,7 +29,8 @@ export function Timeline() {
           start: s.start,
           duration: s.duration,
           label: s.media?.localPath?.split(/[/\\]/).pop() || s.sectionId,
-          color: 'from-indigo-600 via-purple-600 to-violet-700',
+          color: 'from-indigo-700 via-indigo-600 to-violet-700',
+          waveform: false,
         }))
       : [];
 
@@ -34,74 +41,111 @@ export function Timeline() {
   const hasContent = videoItems.length > 0 || narrationItems.length > 0;
 
   return (
-    <GlassPanel className="h-[min(220px,35vh)] min-h-[160px] flex flex-col shrink-0 overflow-hidden" layout={false}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-forge-border/40 shrink-0">
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500">
-          Multi-Track Timeline
-        </span>
-        <span className="text-[10px] font-mono text-forge-cyan/80">
-          {totalDuration.toFixed(0)}s · {videoItems.length} clips
-        </span>
+    <motion.section className="studio-panel flex flex-col shrink-0 overflow-hidden border-forge-border">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-forge-border bg-forge-surface/50 shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleTimeline}
+            className="btn-icon p-1"
+            aria-label={timelineExpanded ? 'Collapse timeline' : 'Expand timeline'}
+          >
+            {timelineExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+          <span className="section-label">Timeline</span>
+        </div>
+        <motion.div className="flex items-center gap-2 text-xs text-forge-text-secondary">
+          <Clock className="w-3.5 h-3.5 text-forge-muted" />
+          <span className="font-mono tabular-nums">{totalDuration.toFixed(1)}s</span>
+          <span className="text-forge-border">|</span>
+          <span>{videoItems.length} clips</span>
+        </motion.div>
       </div>
 
-      <TimelineToolbar zoom={zoom} onZoomChange={setZoom} />
-
-      {!hasContent ? (
-        <div className="flex-1 flex items-center justify-center text-xs text-gray-600 px-4 text-center">
-          Timeline fills in after Generate Scenes or when a render builds the edit
-        </div>
-      ) : (
-        <div
-          className="flex-1 overflow-auto relative px-2 py-2 min-h-0"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left - 80;
-            const lane = rect.width - 80;
-            if (lane > 0) setPlayhead(Math.max(0, Math.min(totalDuration, (x / lane) * totalDuration)));
-          }}
-        >
+      <AnimatePresence initial={false}>
+        {timelineExpanded && (
           <motion.div
-            className="relative min-w-[min(100%,600px)] space-y-1"
-            style={{ minWidth: `${100 * zoom}%` }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex flex-col min-h-[200px] max-h-[min(320px,38vh)]"
           >
-            <div className="playhead-line" style={{ left: `calc(72px + ${playheadPercent}% * (100% - 72px) / 100)` }}>
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md accent-gradient text-[8px] font-mono font-bold text-white whitespace-nowrap shadow-glow-sm">
-                {Math.floor(playhead / 60)}:{String(Math.floor(playhead % 60)).padStart(2, '0')}
-              </div>
-            </div>
+            <TimelineToolbar zoom={zoom} onZoomChange={setZoom} playhead={playhead} totalDuration={totalDuration} />
 
-            {videoItems.length > 0 && (
-              <TimelineTrack label="Video" items={videoItems} totalDuration={totalDuration} zoom={1} />
-            )}
-            {narrationItems.length > 0 && (
-              <TimelineTrack
-                label="Narration"
-                items={narrationItems}
-                totalDuration={totalDuration}
-                zoom={1}
-              />
-            )}
-            {videoItems.length > 0 && (
-              <TimelineTrack
-                label="Music"
-                items={[
-                  {
-                    id: 'music',
-                    start: 0,
-                    duration: totalDuration,
-                    label: 'Background',
-                    color: 'from-blue-600 to-cyan-600',
-                    waveform: true,
-                  },
-                ]}
-                totalDuration={totalDuration}
-                zoom={1}
-                locked
-              />
+            {!hasContent ? (
+              <TimelineEmptyState />
+            ) : (
+              <div
+                className="flex-1 overflow-auto relative px-3 py-2 min-h-[140px] bg-forge-black/40"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left - 64;
+                  const lane = rect.width - 64;
+                  if (lane > 0)
+                    setPlayhead(Math.max(0, Math.min(totalDuration, (x / lane) * totalDuration)));
+                }}
+              >
+                <div className="flex justify-between mb-2 pl-16 pr-2 text-[10px] font-mono text-forge-muted tabular-nums">
+                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                    <span key={pct}>{formatRuler(totalDuration * pct)}</span>
+                  ))}
+                </div>
+
+                <motion.div
+                  className="relative min-w-full space-y-1"
+                  style={{ minWidth: `${Math.max(100, 100 * zoom)}%` }}
+                >
+                  <div className="playhead-line" style={{ left: `calc(64px + ${playheadPercent}% * (100% - 64px) / 100)` }}>
+                    <motion.div className="playhead-cap" />
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-forge-cyan/90 text-[9px] font-mono font-bold text-black whitespace-nowrap">
+                      {formatRuler(playhead)}
+                    </div>
+                  </div>
+
+                  {videoItems.length > 0 && (
+                    <TimelineTrack label="V1" items={videoItems} totalDuration={totalDuration} zoom={zoom} height={44} />
+                  )}
+                  {narrationItems.length > 0 && (
+                    <TimelineTrack
+                      label="A1"
+                      items={narrationItems.map((i) => ({ ...i, waveform: true }))}
+                      totalDuration={totalDuration}
+                      zoom={zoom}
+                      height={36}
+                    />
+                  )}
+                  {videoItems.length > 0 && (
+                    <TimelineTrack
+                      label="A2"
+                      items={[
+                        {
+                          id: 'music',
+                          start: 0,
+                          duration: totalDuration,
+                          label: 'Background score',
+                          color: 'from-sky-800 to-cyan-800',
+                          waveform: true,
+                        },
+                      ]}
+                      totalDuration={totalDuration}
+                      zoom={zoom}
+                      height={32}
+                      locked
+                    />
+                  )}
+                </motion.div>
+              </div>
             )}
           </motion.div>
-        </div>
-      )}
-    </GlassPanel>
+        )}
+      </AnimatePresence>
+    </motion.section>
   );
+}
+
+function formatRuler(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

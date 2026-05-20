@@ -24,6 +24,19 @@ export function createPipelineRouter(root) {
     res.json({ templates: listDocumentaryTemplates(), defaultId: 'template_cinematic_docuforge' });
   });
 
+  router.get('/script-template', (_req, res) => {
+    const filePath = path.join(root, 'templates', 'documentary-script-demo.txt');
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Script template not found' });
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="documentary-script-demo.txt"',
+    );
+    res.send(fs.readFileSync(filePath, 'utf8'));
+  });
+
   router.post('/script', async (req, res) => {
     try {
       const script = await generateDocumentaryScript(req.body);

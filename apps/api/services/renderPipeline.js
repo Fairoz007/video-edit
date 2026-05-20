@@ -30,6 +30,10 @@ import { sanitizeMediaManifest, prepareMoviePyScenes } from '../utils/mediaValid
 import { ensureMediaManifest } from '../utils/placeholderMedia.js';
 import { expandScriptSections } from './scriptLength.js';
 import { normalizeHttpUrl } from '../utils/urlValidate.js';
+import {
+  resolveBackgroundMusicPath,
+  defaultMusicVolume,
+} from '../utils/backgroundMusic.js';
 
 export class RenderPipeline {
   constructor(root) {
@@ -106,7 +110,12 @@ export class RenderPipeline {
 
     try {
       // 1. Script
-      report('script', 5, 'Generating documentary script...');
+      const uploadedScript = Boolean(project.input?.scriptText?.trim());
+      report(
+        'script',
+        5,
+        uploadedScript ? 'Parsing uploaded script…' : 'Generating documentary script…',
+      );
       let script = await generateDocumentaryScript(project.input);
       project.script = script;
       fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
@@ -126,9 +135,13 @@ export class RenderPipeline {
         scrapedMedia = scraped.media || [];
       }
 
-      const researchForScript = [scrapedContent?.text, script.fullNarration].filter(Boolean).join('\n\n');
-      script.sections = expandScriptSections(script.sections, researchForScript);
-      script.fullNarration = script.sections.map((s) => s.narration).join('\n\n');
+      if (!uploadedScript) {
+        const researchForScript = [scrapedContent?.text, script.fullNarration]
+          .filter(Boolean)
+          .join('\n\n');
+        script.sections = expandScriptSections(script.sections, researchForScript);
+        script.fullNarration = script.sections.map((s) => s.narration).join('\n\n');
+      }
       project.script = script;
       fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
 
@@ -330,7 +343,35 @@ export class RenderPipeline {
         throw new Error('Video render failed — intermediate file is invalid');
       }
 
-      report('ffmpeg', 82, 'Final export (mix audio + encode)...');
+      const musicPath = resolveBackgroundMusicPath(this.root, {
+        explicitPath: options.musicPath,
+        projectId,
+      });
+      const theme = project.visualTemplate
+        ? resolveVisualTheme(project.visualTemplate)
+        : resolveVisualTheme(getDocumentaryTemplate(project.input?.templateId));
+      const musicVolume =
+        options.musicVolume ??
+        options.ducking ??
+        theme?.musicDuckLevel ??
+        defaultMusicVolume();
+
+      if (musicPath) {
+        project.backgroundMusic = {
+          path: musicPath,
+          filename: path.basename(musicPath),
+          volume: musicVolume,
+        };
+        fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+      }
+
+      report(
+        'ffmpeg',
+        82,
+        musicPath
+          ? `Final export (mixing ${path.basename(musicPath)} at ${Math.round(musicVolume * 100)}% under narration)...`
+          : 'Final export (mix audio + encode)...',
+      );
       const slug = script.topic.replace(/[^a-z0-9]+/gi, '-').slice(0, 36);
       const exportName = `${slug}-${Date.now()}.${options.format || 'mp4'}`;
       const finalPath = path.join(this.root, 'exports', exportName);
@@ -342,14 +383,17 @@ export class RenderPipeline {
           outputPath: finalPath,
           preset: options.preset || '1080p',
           cinematic: true,
+          musicPath,
+          ducking: musicVolume,
         });
       } else {
         await exportDocumentary({
           videoPath,
           narrationPath: combinedPath,
           outputPath: finalPath,
-          musicPath: options.musicPath || null,
+          musicPath,
           preset: options.preset || '1080p',
+          ducking: musicVolume,
           cinematic: true,
         });
       }

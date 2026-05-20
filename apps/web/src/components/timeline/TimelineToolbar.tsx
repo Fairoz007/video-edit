@@ -8,60 +8,97 @@ import {
   ZoomIn,
   ZoomOut,
   ScanSearch,
+  SkipBack,
+  SkipForward,
+  Play,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface TimelineToolbarProps {
   zoom: number;
   onZoomChange: (z: number) => void;
+  playhead?: number;
+  totalDuration?: number;
 }
 
-export function TimelineToolbar({ zoom, onZoomChange }: TimelineToolbarProps) {
+export function TimelineToolbar({ zoom, onZoomChange, playhead = 0, totalDuration = 0 }: TimelineToolbarProps) {
   const tools = [
     { icon: Undo2, label: 'Undo' },
     { icon: Redo2, label: 'Redo' },
-    { icon: Scissors, label: 'Split' },
+    { icon: Scissors, label: 'Split at playhead' },
     { icon: Trash2, label: 'Delete' },
-    { icon: Magnet, label: 'Ripple' },
-    { icon: Wand2, label: 'Auto Arrange' },
-    { icon: ScanSearch, label: 'AI Scene Detect' },
+    { icon: Magnet, label: 'Snap' },
+    { icon: Wand2, label: 'Auto arrange' },
+    { icon: ScanSearch, label: 'Scene detect' },
   ];
 
+  const formatTc = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-forge-border/40">
+    <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-forge-border bg-forge-surface/30 shrink-0">
       <div className="flex items-center gap-0.5">
+        <button type="button" className="btn-icon p-1.5" title="Play from playhead" aria-label="Play">
+          <Play className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className="btn-icon p-1.5" title="Previous edit" aria-label="Previous">
+          <SkipBack className="w-3.5 h-3.5" />
+        </button>
+        <button type="button" className="btn-icon p-1.5" title="Next edit" aria-label="Next">
+          <SkipForward className="w-3.5 h-3.5" />
+        </button>
+        <span className="w-px h-4 bg-forge-border mx-1" />
         {tools.map(({ icon: Icon, label }) => (
           <motion.button
             key={label}
             type="button"
             title={label}
             className="btn-icon p-1.5"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             <Icon className="w-3.5 h-3.5" />
           </motion.button>
         ))}
       </div>
+
+      <span className="hidden sm:inline text-xs font-mono text-forge-muted tabular-nums">
+        {formatTc(playhead)} / {formatTc(totalDuration)}
+      </span>
+
       <div className="flex items-center gap-2">
-        <ZoomOut
-          className="w-3.5 h-3.5 text-gray-600 cursor-pointer hover:text-white"
+        <button
+          type="button"
+          className="btn-icon p-1"
           onClick={() => onZoomChange(Math.max(0.5, zoom - 0.25))}
-        />
+          aria-label="Zoom out"
+        >
+          <ZoomOut className="w-3.5 h-3.5" />
+        </button>
         <input
           type="range"
           min={0.5}
-          max={2}
+          max={2.5}
           step={0.25}
           value={zoom}
           onChange={(e) => onZoomChange(Number(e.target.value))}
-          className="neon-slider w-24"
+          className="studio-slider w-20 sm:w-28"
+          aria-label="Timeline zoom"
         />
-        <ZoomIn
-          className="w-3.5 h-3.5 text-gray-600 cursor-pointer hover:text-white"
-          onClick={() => onZoomChange(Math.min(2, zoom + 0.25))}
-        />
-        <span className="text-[9px] font-mono text-gray-600 w-8">{Math.round(zoom * 100)}%</span>
+        <button
+          type="button"
+          className="btn-icon p-1"
+          onClick={() => onZoomChange(Math.min(2.5, zoom + 0.25))}
+          aria-label="Zoom in"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+        </button>
+        <span className="text-[10px] font-mono text-forge-muted w-9 text-right tabular-nums">
+          {Math.round(zoom * 100)}%
+        </span>
       </div>
     </div>
   );

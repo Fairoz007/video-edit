@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Lock } from 'lucide-react';
 
 export interface TimelineItem {
   id: string;
@@ -15,7 +16,21 @@ interface Props {
   totalDuration: number;
   zoom?: number;
   locked?: boolean;
-  playheadPercent?: number;
+  height?: number;
+}
+
+function WaveformVisualization({ bars = 24 }: { bars?: number }) {
+  return (
+    <div className="absolute inset-0 flex items-end gap-px px-1 pb-1 opacity-70">
+      {Array.from({ length: bars }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-1 bg-sky-300/50 rounded-sm min-w-0"
+          style={{ height: `${20 + Math.abs(Math.sin(i * 0.55) * 65)}%` }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function TimelineTrack({
@@ -24,21 +39,16 @@ export function TimelineTrack({
   totalDuration,
   zoom = 1,
   locked,
+  height = 40,
 }: Props) {
   return (
-    <div className="flex items-stretch gap-2 h-10 group">
-      <div className="w-[72px] shrink-0 flex items-center justify-end gap-1 pr-1">
-        <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide truncate">
-          {label}
-        </span>
-        {locked && (
-          <span className="text-[8px] text-gray-700" title="Locked">
-            🔒
-          </span>
-        )}
+    <div className="flex items-stretch gap-2 group" style={{ height }}>
+      <div className="w-14 shrink-0 flex items-center justify-end gap-1 pr-1">
+        <span className="text-[10px] font-bold text-forge-muted uppercase tracking-wide">{label}</span>
+        {locked && <Lock className="w-2.5 h-2.5 text-forge-muted/60" aria-label="Locked" />}
       </div>
       <div
-        className="track-lane flex-1 min-w-[400px]"
+        className="track-lane flex-1 min-w-[320px] relative"
         style={{ transform: `scaleX(${zoom})`, transformOrigin: 'left center' }}
       >
         {items.map((item) => {
@@ -47,27 +57,21 @@ export function TimelineTrack({
           return (
             <motion.div
               key={item.id}
-              drag="x"
+              drag={locked ? false : 'x'}
               dragElastic={0}
               dragMomentum={false}
-              className={`absolute top-0.5 bottom-0.5 rounded-md bg-gradient-to-r ${item.color} cursor-grab active:cursor-grabbing clip-glow overflow-hidden border border-white/10`}
-              style={{ left: `${left}%`, width: `${Math.max(width, 1.5)}%` }}
+              className={`absolute top-1 bottom-1 rounded-md bg-gradient-to-r ${item.color} ${
+                locked ? 'cursor-default opacity-80' : 'cursor-grab active:cursor-grabbing'
+              } clip-block overflow-hidden border border-white/10`}
+              style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
               title={item.label}
-              whileHover={{ scaleY: 1.15, zIndex: 10 }}
+              whileHover={locked ? undefined : { scaleY: 1.05, zIndex: 10 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             >
               {item.waveform ? (
-                <div className="absolute inset-0 flex items-end gap-px px-0.5 pb-0.5 opacity-60">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="flex-1 bg-white/40 rounded-sm"
-                      style={{ height: `${30 + Math.sin(i) * 50}%` }}
-                    />
-                  ))}
-                </div>
+                <WaveformVisualization bars={Math.min(40, Math.max(12, Math.floor(width * 2)))} />
               ) : (
-                <span className="absolute inset-0 flex items-center px-1.5 text-[8px] font-medium text-white/90 truncate drop-shadow">
+                <span className="absolute inset-0 flex items-center px-2 text-[10px] font-medium text-white/90 truncate">
                   {item.label}
                 </span>
               )}

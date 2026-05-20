@@ -9,6 +9,7 @@ import {
   Settings,
   Film,
   X,
+  ChevronLeft,
 } from 'lucide-react';
 import { ProjectsPanel } from '../panels/ProjectsPanel';
 import { MediaLibraryPanel } from '../panels/MediaLibraryPanel';
@@ -35,7 +36,8 @@ interface Props {
 export function LeftSidebar({ overlay }: Props) {
   const [active, setActive] = useState<string>('projects');
   const bp = useBreakpoint();
-  const { leftPanelOpen, mobilePanel, setMobilePanel, closeMobilePanels } = useUiStore();
+  const { leftPanelOpen, mobilePanel, setMobilePanel, closeMobilePanels, toggleLeftPanel } =
+    useUiStore();
   const ActivePanel = NAV.find((n) => n.id === active)?.panel ?? ProjectsPanel;
 
   const showPanel = overlay ? mobilePanel === 'left' : leftPanelOpen;
@@ -46,24 +48,48 @@ export function LeftSidebar({ overlay }: Props) {
     if (overlay) setMobilePanel('left');
   };
 
+  if (!overlay && !leftPanelOpen) {
+    return (
+      <motion.nav
+        className="glass-nav w-12 flex flex-col items-center py-3 gap-1 shrink-0 my-3 ml-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <button type="button" onClick={toggleLeftPanel} className="btn-icon" title="Expand library">
+          <Film className="w-4 h-4 text-forge-glow" />
+        </button>
+        {NAV.slice(0, 4).map(({ id, icon: Icon, label }) => (
+          <button
+            key={id}
+            type="button"
+            title={label}
+            onClick={() => {
+              toggleLeftPanel();
+              setActive(id);
+            }}
+            className="btn-icon p-2"
+          >
+            <Icon className="w-4 h-4" />
+          </button>
+        ))}
+      </motion.nav>
+    );
+  }
+
   return (
     <div
-      className={`flex gap-2 shrink-0 h-full py-2 pl-2 z-40 ${
+      className={`flex gap-2 shrink-0 h-full py-3 pl-3 z-40 ${
         overlay && !showPanel ? 'relative' : overlay ? 'absolute left-0 top-0 bottom-0' : 'relative'
       }`}
     >
       <motion.nav
-        className="glass-nav w-[52px] flex flex-col items-center py-3 gap-1 shrink-0"
-        initial={{ x: -20, opacity: 0 }}
+        className="glass-nav w-14 flex flex-col items-center py-3 gap-0.5 shrink-0"
+        initial={{ x: -12, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >
-        <motion.div
-          className="mb-3 w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-sm"
-          animate={{ rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-        >
+        <div className="mb-2 w-9 h-9 rounded-studio accent-gradient flex items-center justify-center">
           <Film className="w-4 h-4 text-white" />
-        </motion.div>
+        </div>
 
         {NAV.map(({ id, label, icon: Icon }) => {
           const isActive = active === id && showPanel;
@@ -73,17 +99,16 @@ export function LeftSidebar({ overlay }: Props) {
               type="button"
               title={label}
               onClick={() => openPanel(id)}
-              className={`relative p-2.5 rounded-xl transition-all duration-300 ${
-                isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+              className={`relative p-2.5 rounded-studio transition-colors duration-200 ${
+                isActive ? 'text-forge-text bg-white/[0.08]' : 'text-forge-muted hover:text-forge-text-secondary hover:bg-white/[0.04]'
               }`}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
             >
               {isActive && (
                 <motion.div
-                  layoutId="nav-glow"
-                  className="absolute inset-0 rounded-xl bg-forge-accent/25 border border-forge-border-bright shadow-glow-sm"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  layoutId="nav-indicator"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-forge-accent"
                 />
               )}
               <Icon className="w-[18px] h-[18px] relative z-10" />
@@ -91,6 +116,11 @@ export function LeftSidebar({ overlay }: Props) {
           );
         })}
 
+        {!isMobile && !overlay && (
+          <button type="button" onClick={toggleLeftPanel} className="btn-icon mt-auto" title="Collapse">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
         {!isMobile && <UserProfile />}
       </motion.nav>
 
@@ -98,34 +128,40 @@ export function LeftSidebar({ overlay }: Props) {
         {showPanel && (
           <motion.aside
             key={active}
-            initial={{ width: 0, opacity: 0, x: overlay ? -20 : 0 }}
-            animate={{ width: overlay ? 280 : 248, opacity: 1, x: 0 }}
-            className="glass-panel-float overflow-hidden flex flex-col min-h-0 max-h-full shadow-float w-[min(280px,calc(100vw-4.5rem))] xl:w-[248px]"
-            exit={{ width: 0, opacity: 0, x: overlay ? -20 : 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ width: 0, opacity: 0, x: overlay ? -16 : 0 }}
+            animate={{ width: overlay ? 300 : 260, opacity: 1, x: 0 }}
+            exit={{ width: 0, opacity: 0, x: overlay ? -16 : 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="studio-panel overflow-hidden flex flex-col min-h-0 max-h-full w-[min(300px,calc(100vw-4.5rem))]"
           >
             {overlay && (
-              <div className="flex items-center justify-between px-3 py-2 border-b border-forge-border/40 shrink-0">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <motion.div className="flex items-center justify-between px-4 py-3 border-b border-forge-border shrink-0">
+                <span className="text-label-sm text-forge-text-secondary">
                   {NAV.find((n) => n.id === active)?.label}
                 </span>
                 <button type="button" onClick={closeMobilePanels} className="btn-icon p-1.5">
                   <X className="w-4 h-4" />
                 </button>
+              </motion.div>
+            )}
+            {!overlay && (
+              <div className="flex items-center justify-between px-4 py-3 border-b border-forge-border shrink-0">
+                <span className="text-sm font-semibold text-forge-text">
+                  {NAV.find((n) => n.id === active)?.label}
+                </span>
               </div>
             )}
-            <motion.div className="p-3 flex-1 overflow-y-auto flex flex-col min-h-0">
+            <motion.div className="p-4 flex-1 overflow-y-auto flex flex-col min-h-0">
               {active === 'settings' ? (
-                <div className="text-center py-8">
-                  <Settings className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">Open the right inspector for settings</p>
-                </div>
+                <p className="text-sm text-forge-text-secondary text-center py-8">
+                  Open the inspector panel on the right for project settings.
+                </p>
               ) : (
                 <ActivePanel />
               )}
             </motion.div>
             {isMobile && (
-              <div className="p-2 border-t border-forge-border/40">
+              <div className="p-3 border-t border-forge-border">
                 <UserProfile />
               </div>
             )}

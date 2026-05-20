@@ -13,6 +13,7 @@ import {
 import { generateScriptWithGroq, isGroqConfigured } from './groqScript.js';
 import { generateScriptWithGemini, isGeminiConfigured } from './geminiScript.js';
 import { expandScriptSections } from './scriptLength.js';
+import { parseUploadedScriptText } from './scriptTextParser.js';
 import { isValidHttpUrl, normalizeHttpUrl } from '../utils/urlValidate.js';
 
 const FALLBACK_SECTIONS = {
@@ -298,6 +299,11 @@ async function tryGenerateLlmScript(primaryTopic, researchText, sourceMeta) {
 }
 
 export async function generateDocumentaryScript(input) {
+  const uploaded = String(input?.scriptText || '').trim();
+  if (uploaded) {
+    return parseUploadedScriptText(uploaded, { topic: input?.topic });
+  }
+
   const { primaryTopic, researchText, wiki, sourceMeta } = await gatherResearchContext(input);
   const research = researchText || wiki.extract;
 

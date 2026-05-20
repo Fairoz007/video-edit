@@ -1,0 +1,128 @@
+# DocuForge — Cinematic documentary script template
+# 1. Change TOPIC below to your subject.
+# 2. Edit narration and visuals in each [section] block.
+# 3. Save as .txt and upload in the app (Upload script tab).
+# Duration hints are optional; the app scales sections to your target video length (~3 min default).
+
+TOPIC: YOUR TOPIC HERE — e.g. The 2026 FIFA World Cup
+
+[opening]
+Scene Heading: Before the Storm
+Title: Cold Open
+Duration: 15
+Visual Direction: Slow aerial drift over a vast stadium at blue hour; lens flare on floodlights; shallow depth of field.
+B-Roll: aerial stadium night lights | empty football pitch fog dawn
+Audio: Low drone pad; distant crowd murmur; single piano note.
+Transition: Fade in from black; two seconds of silence before the first word.
+
+Narration:
+Some stories do not announce themselves.
+They arrive like weather — quiet at first, then impossible to ignore.
+This is the story of YOUR TOPIC HERE.
+And it begins long before anyone thought to name it.
+
+[introduction]
+Scene Heading: The Central Question
+Title: Why It Matters
+Duration: 18
+Visual Direction: Handheld intimacy — faces in crowd, tickets, flags; natural light; shallow focus.
+B-Roll: documentary crowd portrait | stadium entrance wide
+Audio: Sparse strings; room tone; heartbeat-adjacent pulse very low.
+Transition: Match cut from wide skyline to close human detail.
+
+Narration:
+To understand what is coming, you have to sit with a question that will not go away.
+Why does this moment matter — not on a poster, but in the lives of millions who will never touch the pitch?
+The answer is not in a single date on a calendar.
+It is in everything that had to break, bend, or burn to get here.
+
+[backstory]
+Scene Heading: Roots in Shadow
+Title: Backstory
+Duration: 22
+Visual Direction: Archival grain, slower camera; maps, old footage, newspaper headlines if relevant.
+B-Roll: vintage archive footage | old photographs documentary
+Audio: Muted percussion; optional tape hiss; narration forward in the mix.
+Transition: Dissolve between eras; L-cut on a key line.
+
+Narration:
+The past does not stay past.
+Every decision made in boardrooms and back rooms still pulls on the present like gravity.
+What looked inevitable from a distance was, up close, a chain of fragile choices under pressure.
+Historians argue the details; the feeling remains the same — something enormous was already in motion.
+
+[rising_action]
+Scene Heading: Pressure Builds
+Title: Rising Action
+Duration: 35
+Visual Direction: Quicker cuts, handheld energy, contrast rising; crowds, travel, construction, preparation.
+B-Roll: timelapse city lights | athletes training silhouette
+Audio: Rhythm enters; tension strings; crowd swell on cuts.
+Transition: Smash cuts on impact words; cross-dissolve for geography jumps.
+
+Narration:
+Then the ground shifted.
+What had been background noise became the main event — expansion, conflict, ambition, fear.
+Critics and believers fought in public while planners moved pieces on a board the world could not fully see.
+Momentum gathered, and with it stakes no one could pretend were small.
+Every headline was a drumbeat; every delay, a held breath.
+
+[revelation]
+Scene Heading: The Unveiling
+Title: Revelation
+Duration: 25
+Visual Direction: Stillness after motion; hold on a face or a decisive object; light changes on a key reveal.
+B-Roll: dramatic window light portrait | document close-up hands
+Audio: Music drops to near-silence; one sustained note.
+Transition: Slow push-in; hold two beats after the line lands.
+
+Narration:
+And then — the detail that changes everything.
+Not louder. Clearer.
+The format, the host, the rule, the number — whatever your story's hinge is — stops being rumor and becomes fact.
+In that instant, the future is no longer abstract.
+It has a address, a date, and a price.
+
+[climax]
+Scene Heading: Breaking Point
+Title: Climax
+Duration: 32
+Visual Direction: Peak contrast; full-frame action or emotional close-up; sound design carries weight.
+B-Roll: dramatic stadium lights storm | celebration or protest crowd cinematic
+Audio: Full score swell; impact SFX used sparingly; narration rides on top.
+Transition: Optional white flash; return to image on the downbeat.
+
+Narration:
+This was the moment the idea became a force — felt in real rooms, real streets, real lives.
+Not everyone celebrated; not everyone agreed.
+But everyone understood: the world had chosen a direction, and there was no quiet way back.
+The roar — or the silence — said what words could not.
+
+[conclusion]
+Scene Heading: Aftermath
+Title: Conclusion
+Duration: 18
+Visual Direction: Softer light, wider frames, breathing room; dawn, empty corridors, quiet streets.
+B-Roll: sunrise calm landscape | empty stadium seats morning
+Audio: Warm strings resolve; ambience returns; music fades under narration.
+Transition: Gentle dissolves; longer holds.
+
+Narration:
+When the noise faded, what remained was not a headline — but a changed landscape.
+Legacies are not built in ninety minutes on a field; they are built in what people carry home afterward.
+The story of YOUR TOPIC HERE is still being written in every choice that follows.
+
+[ending]
+Scene Heading: Last Light
+Title: Ending
+Duration: 15
+Visual Direction: Single powerful image; hold; fade toward black.
+B-Roll: cinematic sunset silhouette | night city bokeh lights
+Audio: Music resolves to silence; one final ambient texture.
+Transition: Fade to black; end on held image.
+
+Narration:
+Stories like this do not end.
+They echo — in what we choose to remember, and what we dare to do next.
+If this chapter taught us anything, it is that the future is still unwritten.
+The only question left is who is willing to meet it.

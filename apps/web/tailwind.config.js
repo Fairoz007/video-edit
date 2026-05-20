@@ -14,6 +14,7 @@ export default {
           border: 'rgba(255, 255, 255, 0.06)',
           'border-strong': 'rgba(255, 255, 255, 0.1)',
           'border-accent': 'rgba(99, 102, 241, 0.22)',
+          'border-bright': 'rgba(99, 102, 241, 0.22)',
           accent: '#5b63f0',
           purple: '#8b6cf6',
           blue: '#3b82f6',

@@ -9,19 +9,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Volume2,
-  Sparkles,
+  VolumeX,
   Loader2,
+  Film,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GlassPanel } from '../ui/GlassPanel';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { getLatestExport, getProject } from '../../utils/api';
 import { toExportUrl, toExportUrlDirect } from '../../utils/mediaUrl';
+import { EmptyState } from '../ui/EmptyState';
 
 function formatTimecode(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const f = Math.floor((sec % 1) * 30);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(f).padStart(2, '0')}`;
 }
 
 export function VideoPreview() {
@@ -111,6 +113,13 @@ export function VideoPreview() {
     setCurrentTime(el.currentTime);
   };
 
+  const seekToPercent = (pct: number) => {
+    const el = videoRef.current;
+    if (!el?.duration) return;
+    el.currentTime = pct * el.duration;
+    setCurrentTime(el.currentTime);
+  };
+
   const openExport = () => {
     if (!outputPath) return;
     window.docuforge?.showItemInFolder(outputPath);
@@ -123,38 +132,36 @@ export function VideoPreview() {
     else el.requestFullscreen?.();
   };
 
-  const topic = script?.topic || input.topic || 'Your documentary';
+  const topic = script?.topic || input.topic || 'Untitled documentary';
   const isRendering = status === 'rendering';
+  const progressPct = duration ? (currentTime / duration) * 100 : 0;
 
   return (
-    <GlassPanel className="flex-1 min-h-[180px] sm:min-h-[220px] flex flex-col overflow-hidden" layout>
-      <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-forge-border/40 shrink-0">
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500">
-          Preview
-        </span>
-        <div className="flex items-center gap-1.5">
+    <motion.section className="h-full min-h-[200px] flex flex-col studio-panel overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-forge-border shrink-0 bg-gradient-subtle">
+        <div className="flex items-center gap-3">
+          <span className="section-label">Program monitor</span>
           {outputPath && !isRendering && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/12 text-emerald-400 border border-emerald-500/20">
               Ready
             </span>
           )}
           {isRendering && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md bg-forge-accent/20 text-forge-glow animate-pulse">
-              Rendering…
-            </span>
-          )}
-          {loading && outputPath && (
-            <span className="text-[9px] px-2 py-0.5 rounded-md bg-white/5 text-gray-400 flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-forge-accent/15 text-forge-glow flex items-center gap-1">
               <Loader2 className="w-2.5 h-2.5 animate-spin" />
-              Loading
+              Rendering
             </span>
           )}
         </div>
+        <span className="text-xs font-mono text-forge-muted tabular-nums">
+          {formatTimecode(currentTime)}
+          {duration > 0 ? ` / ${formatTimecode(duration)}` : ''}
+        </span>
       </div>
 
       <div
         ref={containerRef}
-        className="flex-1 relative m-2 sm:m-3 rounded-2xl overflow-hidden bg-black border border-forge-border/30 min-h-[140px]"
+        className="flex-1 relative m-3 rounded-studio-lg overflow-hidden bg-black border border-forge-border min-h-[200px]"
       >
         {videoSrc && !playError ? (
           <video
@@ -180,140 +187,145 @@ export function VideoPreview() {
             onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
           />
         ) : playError && outputPath ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-amber-400/90 px-4">
-            <p className="text-sm font-medium">Preview could not load in the app</p>
-            <p className="text-xs text-gray-500 mt-1 mb-3">The export file exists — open it locally.</p>
-            <button
-              type="button"
-              onClick={openExport}
-              className="btn-primary text-xs flex items-center gap-1.5"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              Open file
-            </button>
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+            <EmptyState
+              compact
+              icon={Film}
+              title="Preview unavailable"
+              description="The export exists on disk — open it in your default player."
+              action={
+                <button type="button" onClick={openExport} className="btn-primary text-xs flex items-center gap-1.5">
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Reveal in folder
+                </button>
+              }
+            />
           </div>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex flex-col items-center justify-center p-4 text-center">
-            <Sparkles className="w-8 h-8 text-forge-purple/50 mb-3" />
-            <p className="text-[10px] uppercase tracking-[0.25em] text-forge-cyan/70 mb-2">
-              {isRendering ? 'Rendering' : 'Awaiting export'}
-            </p>
-            <h2 className="text-base sm:text-xl font-bold text-white tracking-tight line-clamp-2">
-              {topic}
-            </h2>
-            <p className="text-[10px] text-gray-500 mt-2 max-w-xs">
-              {isRendering
-                ? 'Preview appears when the pipeline finishes'
-                : 'Generate a script, then Render Documentary'}
-            </p>
+          <div className="absolute inset-0 bg-gradient-to-b from-forge-navy via-forge-surface to-black flex flex-col items-center justify-center p-6">
+            {loading && outputPath ? (
+              <Loader2 className="w-8 h-8 text-forge-muted animate-spin mb-3" />
+            ) : null}
+            <EmptyState
+              compact
+              icon={Film}
+              title={topic}
+              description={
+                isRendering
+                  ? 'Your export will appear here when rendering completes.'
+                  : 'Generate a script, assemble scenes, then render to preview your documentary.'
+              }
+              hint={isRendering ? undefined : 'Tip: collapse Source panel below when you need more preview space'}
+            />
+          </div>
+        )}
+
+        {loading && videoSrc && !playError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none">
+            <Loader2 className="w-8 h-8 text-forge-text animate-spin" />
           </div>
         )}
       </div>
 
-      <div className="px-3 sm:px-4 pb-3 space-y-2 shrink-0">
-        <div className="flex items-center gap-2">
-          <div
-            className="flex-1 h-1 rounded-full bg-black/50 overflow-hidden cursor-pointer"
-            role="slider"
-            aria-label="Seek"
-            onClick={(e) => {
-              const el = videoRef.current;
-              if (!el?.duration) return;
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = (e.clientX - rect.left) / rect.width;
-              el.currentTime = pct * el.duration;
-            }}
-          >
-            <motion.div
-              className="h-full accent-gradient transition-all"
-              style={{
-                width: `${duration ? (currentTime / duration) * 100 : 0}%`,
-              }}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-gray-500 tabular-nums shrink-0">
-            {formatTimecode(currentTime)}
-            {duration > 0 ? ` / ${formatTimecode(duration)}` : ''}
-          </span>
-        </div>
+      <motion.div className="px-4 pb-4 space-y-3 shrink-0">
+        <motion.div
+          className="relative h-1.5 rounded-full bg-forge-surface border border-forge-border overflow-hidden cursor-pointer group"
+          role="slider"
+          aria-label="Timeline scrubber"
+          aria-valuenow={progressPct}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            seekToPercent((e.clientX - rect.left) / rect.width);
+          }}
+        >
+          <motion.div
+            className="h-full accent-gradient relative"
+            style={{ width: `${progressPct}%` }}
+          />
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-card opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ left: `calc(${progressPct}% - 6px)` }}
+          />
+        </motion.div>
 
-        <div className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={() => seek(-1 / 30)}
-            disabled={!videoSrc || playError}
-            aria-label="Previous frame"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={() => seek(-5)}
-            disabled={!videoSrc || playError}
-            aria-label="Skip back"
-          >
-            <SkipBack className="w-4 h-4" />
-          </button>
-          <motion.button
-            type="button"
-            onClick={() => videoSrc && !playError && setPlaying(!playing)}
-            disabled={!videoSrc || playError || loading}
-            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full accent-gradient flex items-center justify-center shadow-glow disabled:opacity-40"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-          >
-            {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </motion.button>
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={() => seek(5)}
-            disabled={!videoSrc || playError}
-            aria-label="Skip forward"
-          >
-            <SkipForward className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={() => seek(1 / 30)}
-            disabled={!videoSrc || playError}
-            aria-label="Next frame"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={() => setMuted(!muted)}
-            disabled={!videoSrc || playError}
-            aria-label="Mute"
-          >
-            <Volume2 className={`w-4 h-4 ${muted ? 'opacity-40' : ''}`} />
-          </button>
-          {outputPath && (
+        <div className="flex items-center justify-between gap-2">
+          <motion.div className="flex items-center gap-0.5">
             <button
               type="button"
-              onClick={openExport}
-              className="btn-icon p-1.5"
-              aria-label="Reveal in folder"
+              className="btn-icon"
+              onClick={() => seek(-1 / 30)}
+              disabled={!videoSrc || playError}
+              aria-label="Previous frame"
             >
-              <FolderOpen className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          )}
-          <button
-            type="button"
-            className="btn-icon p-1.5"
-            onClick={toggleFullscreen}
-            disabled={!videoSrc || playError}
-            aria-label="Fullscreen"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => seek(-5)}
+              disabled={!videoSrc || playError}
+              aria-label="Skip back 5s"
+            >
+              <SkipBack className="w-4 h-4" />
+            </button>
+            <motion.button
+              type="button"
+              onClick={() => videoSrc && !playError && setPlaying(!playing)}
+              disabled={!videoSrc || playError || loading}
+              className="w-11 h-11 mx-1 rounded-full accent-gradient flex items-center justify-center disabled:opacity-40"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              aria-label={playing ? 'Pause' : 'Play'}
+            >
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+            </motion.button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => seek(5)}
+              disabled={!videoSrc || playError}
+              aria-label="Skip forward 5s"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => seek(1 / 30)}
+              disabled={!videoSrc || playError}
+              aria-label="Next frame"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </motion.div>
+
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => setMuted(!muted)}
+              disabled={!videoSrc || playError}
+              aria-label={muted ? 'Unmute' : 'Mute'}
+            >
+              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+            {outputPath && (
+              <button type="button" onClick={openExport} className="btn-icon" aria-label="Reveal in folder">
+                <FolderOpen className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={toggleFullscreen}
+              disabled={!videoSrc || playError}
+              aria-label="Fullscreen"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
-    </GlassPanel>
+      </motion.div>
+    </motion.section>
   );
 }

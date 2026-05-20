@@ -27,9 +27,9 @@ export function RenderProgress() {
         initial={{ opacity: 0, y: 8, height: 0 }}
         animate={{ opacity: 1, y: 0, height: 'auto' }}
         exit={{ opacity: 0, height: 0 }}
-        className="glass-panel p-3 shrink-0 mx-0 border-forge-border-bright/30"
+        className="studio-panel p-4 shrink-0"
       >
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2.5 mb-3">
           {status === 'completed' ? (
             <CheckCircle className="w-4 h-4 text-emerald-400" />
           ) : status === 'failed' ? (
@@ -37,33 +37,29 @@ export function RenderProgress() {
           ) : (
             <Loader2 className="w-4 h-4 text-forge-accent animate-spin" />
           )}
-          <span className="text-sm font-medium text-white">{message || 'Processing…'}</span>
-          <span className="text-xs text-forge-glow ml-auto font-mono font-bold">{progress}%</span>
+          <span className="text-sm font-medium text-forge-text">{message || 'Processing…'}</span>
+          <span className="text-xs text-forge-glow ml-auto font-mono font-semibold tabular-nums">
+            {progress}%
+          </span>
         </div>
 
-        <div className="h-2 bg-black/50 rounded-full overflow-hidden border border-forge-border/30">
+        <div className="h-1.5 bg-forge-surface rounded-full overflow-hidden border border-forge-border">
           <motion.div
-            className="h-full accent-gradient relative"
+            className="h-full accent-gradient"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-              animate={{ x: ['-100%', '200%'] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
-          </motion.div>
+          />
         </div>
 
-        <div className="flex gap-1 mt-2 flex-wrap">
+        <div className="flex gap-1 mt-3 flex-wrap">
           {STAGES.map((s, i) => (
             <span
               key={s}
-              className={`text-[8px] px-1.5 py-0.5 rounded-md font-medium uppercase tracking-wide ${
+              className={`text-[9px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wide ${
                 i <= stageIndex
-                  ? 'bg-forge-accent/25 text-forge-glow border border-forge-accent/30'
-                  : 'bg-white/5 text-gray-600'
+                  ? 'bg-forge-accent/15 text-forge-glow border border-forge-border-accent'
+                  : 'bg-forge-surface text-forge-muted border border-forge-border'
               }`}
             >
               {s}
@@ -74,7 +70,7 @@ export function RenderProgress() {
         {outputPath && status === 'completed' && (
           <button
             type="button"
-            className="mt-2 text-xs text-forge-cyan hover:underline"
+            className="mt-3 text-xs text-sky-400 hover:text-sky-300 transition-colors"
             onClick={() => window.docuforge?.showItemInFolder(outputPath)}
           >
             Open export folder →

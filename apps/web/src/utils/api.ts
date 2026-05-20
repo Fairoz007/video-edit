@@ -25,6 +25,9 @@ export const createProject = (input: DocumentaryInput) =>
 // Pipeline
 export const generateScript = (input: DocumentaryInput) =>
   api.post('/pipeline/script', input);
+
+export const downloadScriptTemplate = () =>
+  api.get('/pipeline/script-template', { responseType: 'blob' });
 export const extractKeywords = (payload: {
   text?: string;
   topic?: string;
@@ -140,6 +143,8 @@ export interface DocumentaryInput {
   topic?: string;
   articleUrl?: string;
   youtubeUrl?: string;
+  /** Full .txt script content (cinematic template format); skips LLM generation. */
+  scriptText?: string;
   voice?: string;
   rate?: number;
   pitch?: number;

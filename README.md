@@ -48,11 +48,13 @@ npm install
 3. Downloads Chatterbox-Turbo model weights (Hugging Face)
 4. Installs Playwright Chromium
 
-Then add API keys to `.env` (Pexels, Pixabay, Groq, etc.) and start:
+Then add API keys to `.env` (Pexels, Pixabay, Groq, etc.) and start **from the repo root** (one command — no per-app terminals):
 
 ```bash
-npm run dev          # API + web + Electron
-npm run dev:web      # API + web only
+npm run dev          # API + Vite + Electron (development)
+npm run dev:web      # API + Vite in browser only
+npm run start        # Production: build UI, API + Electron (no Vite dev server)
+npm run start:web    # Production: build UI, API + static preview in browser
 ```
 
 **Skip auto-setup** (CI / no Python): `DOCUFORGE_SKIP_SETUP=1 npm install`  
@@ -67,14 +69,28 @@ npm run kill:ports
 
 Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same line as commands.
 
+## Upload your own script
+
+Download the cinematic template from the app (**Upload script** → **Download demo template**) or from the API:
+
+`GET /api/pipeline/script-template`
+
+Edit `TOPIC:` and each `[section]` block (scene heading, visuals, B-roll, narration), save as `.txt`, then upload. This skips LLM generation and uses your narration for TTS and subtitles.
+
+Template file: `templates/documentary-script-demo.txt`
+
 ## Workspace scripts
+
+All commands run from the **monorepo root** unless noted.
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | API + web + Electron |
-| `npm run dev:web` | API + web |
-| `npm run dev -w @docuforge/api` | Backend only |
-| `npm run dev -w @docuforge/web` | Vite only |
+| `npm run dev` | API + Vite + Electron (single terminal) |
+| `npm run dev:web` | API + Vite in browser |
+| `npm run start` | Build + API + Electron (production-like) |
+| `npm run start:web` | Build + API + Vite preview (browser, no Electron) |
+| `npm run build` | Compile Electron shell + production web bundle |
+| `npm run kill:ports` | Free ports 3847 / 5173 (Windows + macOS/Linux) |
 | `npm run remotion:studio` | Remotion Studio |
 | `npm run setup` | Re-run Python deps + Chatterbox model download |
 | `npm run chatterbox:health` | Check TTS / device |
@@ -89,6 +105,10 @@ Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same l
 5. **MoviePy** → clip sequence + audio sync  
 6. **Remotion** (fallback/enhance) → motion graphics  
 7. **FFmpeg** → effects, mix, burn subs, encode  
+
+## Background music
+
+Place royalty-free tracks in the repo [`music/`](music/) folder (`.mp3`, `.wav`, etc.). Every render automatically picks one track (stable per project) and mixes it **quietly under narration** (~12% volume by default). Override with `MUSIC_BG_VOLUME=0.12` in `.env`, or set `MUSIC_BG_DISABLED=1` to turn off.
 
 ## Export presets
 

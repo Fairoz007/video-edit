@@ -8,17 +8,15 @@
     "packages/*"
   ],
   "scripts": {
-    "kill:vite": "lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true",
-    "kill:backend": "lsof -tiTCP:3847 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true",
-    "kill:ports": "npm run kill:vite && npm run kill:backend",
+    "kill:ports": "node scripts/kill-ports.mjs",
     "dev:check-ports": "node scripts/warn-if-ports-busy.mjs",
-    "dev": "npm run dev:check-ports && concurrently -n api,web,desktop -c blue,green,magenta \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\" \"npm run dev -w @docuforge/desktop\"",
+    "dev": "npm run dev:check-ports && concurrently -k -n api,web,desktop -c blue,green,magenta \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\" \"npm run dev -w @docuforge/desktop\"",
     "dev:force": "npm run kill:ports && npm run dev",
-    "dev:web": "npm run dev:check-ports && concurrently -n api,web -c blue,green \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\"",
+    "dev:web": "npm run dev:check-ports && concurrently -k -n api,web -c blue,green \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\"",
     "dev:web:force": "npm run kill:ports && npm run dev:web",
-    "dev:backend": "npm run dev -w @docuforge/api",
-    "restart:backend": "npm run kill:backend && npm run dev:backend",
     "build": "npm run build:electron -w @docuforge/desktop && npm run build -w @docuforge/web",
+    "start": "npm run build && concurrently -k -n api,desktop -c blue,magenta \"npm run start -w @docuforge/api\" \"wait-on tcp:3847 && npm run start -w @docuforge/desktop\"",
+    "start:web": "npm run build -w @docuforge/web && concurrently -k -n api,web -c blue,magenta \"npm run start -w @docuforge/api\" \"wait-on tcp:3847 && npm run preview -w @docuforge/web\"",
     "build:electron": "npm run build && npm run build:app -w @docuforge/desktop",
     "remotion:studio": "npm run studio -w @docuforge/remotion",
     "remotion:render": "npm run render:documentary -w @docuforge/remotion",
@@ -34,6 +32,7 @@
     "clean:workspace": "node scripts/clean-workspace.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "wait-on": "^8.0.1"
   }
 }

@@ -62,6 +62,10 @@ function scalePadFilter(w, h, cinematic = true) {
   return `${base},eq=contrast=1.06:brightness=0.02:saturation=1.08,vignette=PI/5,fade=t=in:st=0:d=0.8,format=yuv420p`;
 }
 
+function withLoopedMusicInput(cmd, musicPath) {
+  return cmd.input(musicPath).inputOptions(['-stream_loop', '-1']);
+}
+
 /**
  * One-pass: scale, optional grade, mux narration (+ optional music), browser-safe encode.
  */
@@ -73,6 +77,8 @@ export async function exportVideoOnly({
   outputPath,
   preset = '1080p',
   cinematic = true,
+  musicPath = null,
+  ducking = 0.12,
 }) {
   if (!fs.existsSync(videoPath)) throw new Error(`Video not found: ${videoPath}`);
 
@@ -84,19 +90,43 @@ export async function exportVideoOnly({
   if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
   const vf = scalePadFilter(w, h, cinematic);
+  const hasMusic = musicPath && fs.existsSync(musicPath);
 
   return new Promise((resolve, reject) => {
-    const cmd = ffmpeg()
-      .input(videoPath)
-      .videoFilters(vf)
-      .outputOptions([
-        '-c:v',
-        'libx264',
-        ...BROWSER_VIDEO_OPTS,
-        '-an',
-        '-movflags',
-        '+faststart',
-      ]);
+    let cmd = ffmpeg().input(videoPath);
+
+    if (hasMusic) {
+      cmd = withLoopedMusicInput(cmd, musicPath);
+      cmd
+        .complexFilter(
+          [
+            `[0:v]${vf}[vout]`,
+            `[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${ducking}[aout]`,
+          ].join(';'),
+        )
+        .outputOptions([
+          '-map',
+          '[vout]',
+          '-map',
+          '[aout]',
+          '-c:v',
+          'libx264',
+          ...BROWSER_VIDEO_OPTS,
+          ...BROWSER_AUDIO_OPTS,
+          '-shortest',
+        ]);
+    } else {
+      cmd = cmd
+        .videoFilters(vf)
+        .outputOptions([
+          '-c:v',
+          'libx264',
+          ...BROWSER_VIDEO_OPTS,
+          '-an',
+          '-movflags',
+          '+faststart',
+        ]);
+    }
 
     const bin = findFfmpegPath();
     if (bin) cmd.setFfmpegPath(bin);
@@ -132,7 +162,7 @@ export async function exportDocumentary({
   outputPath,
   musicPath = null,
   preset = '1080p',
-  ducking = 0.22,
+  ducking = 0.12,
   cinematic = true,
 }) {
   if (!fs.existsSync(videoPath)) throw new Error(`Video not found: ${videoPath}`);
@@ -160,7 +190,7 @@ export async function exportDocumentary({
     let cmd = ffmpeg().input(videoPath).input(narrationPath);
 
     if (musicPath && fs.existsSync(musicPath)) {
-      cmd = cmd.input(musicPath);
+      cmd = withLoopedMusicInput(cmd, musicPath);
       cmd
         .complexFilter(
           [

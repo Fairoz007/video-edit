@@ -8,24 +8,22 @@ export default function App() {
       className="h-full flex flex-col cinematic-bg relative overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.4 }}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-forge-purple/10 blur-[100px]" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
         <motion.div
-          className="absolute top-1/4 -right-24 w-80 h-80 rounded-full bg-forge-blue/10 blur-[90px]"
-          animate={{ opacity: [0.4, 0.7, 0.4], scale: [1, 1.1, 1] }}
-          transition={{ duration: 8, repeat: Infinity }}
+          className="absolute -top-40 right-0 w-[420px] h-[420px] rounded-full bg-forge-accent/[0.04] blur-[120px]"
+          animate={{ opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <div className="absolute bottom-0 left-1/3 w-[500px] h-48 bg-forge-accent/5 blur-[80px]" />
       </div>
 
       <TopToolbar />
       <motion.main
-        className="flex-1 overflow-hidden relative z-10"
-        initial={{ opacity: 0, y: 8 }}
+        className="flex-1 overflow-hidden relative z-10 min-h-0"
+        initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, delay: 0.1 }}
+        transition={{ duration: 0.35, delay: 0.05 }}
       >
         <EditorLayout />
       </motion.main>

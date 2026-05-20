@@ -1,29 +1,11 @@
 #!/usr/bin/env node
 /**
  * Exit 1 if dev ports are already in use (prevents a second `npm run dev` from
- * kill -9'ing the first backend via kill:ports).
+ * killing the first backend via kill:ports).
  */
-import { execSync } from 'child_process';
+import { listBusyDevPorts } from './port-utils.mjs';
 
-const PORTS = [
-  { port: 3847, name: 'backend' },
-  { port: 5173, name: 'vite' },
-];
-
-function pidsOnPort(port) {
-  try {
-    const out = execSync(`lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null`, {
-      encoding: 'utf8',
-    }).trim();
-    return out ? out.split('\n').filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
-const busy = PORTS.flatMap(({ port, name }) =>
-  pidsOnPort(port).map((pid) => ({ port, name, pid })),
-);
+const busy = await listBusyDevPorts();
 
 if (busy.length === 0) {
   process.exit(0);
