@@ -17,6 +17,7 @@ import { createExportsRouter } from './routes/exports.js';
 import { initFfmpeg } from './utils/ffmpegPath.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
 import { resolvePython } from './utils/resolvePython.js';
+import { prewarmChatterboxWorker } from './services/chatterboxBridge.js';
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -72,9 +73,8 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   const providers = [
     process.env.GEMINI_API_KEY && 'Gemini (script)',
     process.env.GROQ_API_KEY && 'Groq (script)',
-    process.env.UNSPLASH_ACCESS_KEY && 'Unsplash',
-    process.env.PEXELS_API_KEY && 'Pexels',
-    process.env.PIXABAY_API_KEY && 'Pixabay',
+    process.env.PEXELS_API_KEY && 'Pexels (video)',
+    process.env.PIXABAY_API_KEY && 'Pixabay (video)',
   ].filter(Boolean);
   console.log(`[DocuForge] Backend running on http://localhost:${PORT}`);
   console.log(`[DocuForge] Media APIs: ${providers.length ? providers.join(', ') : 'none configured'}`);
@@ -87,9 +87,14 @@ const server = app.listen(PORT, '127.0.0.1', () => {
       `[DocuForge] TTS: ElevenLabs (${process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2'})`,
     );
   } else {
+    const device = process.env.CHATTERBOX_DEVICE?.trim() || 'auto (cuda→mps→cpu)';
     console.log(
-      `[DocuForge] TTS: Chatterbox (python: ${resolvePython()})`,
+      `[DocuForge] TTS: Chatterbox (python: ${resolvePython()}, device: ${device})`,
     );
+  }
+
+  if (process.env.CHATTERBOX_ONESHOT === '0') {
+    prewarmChatterboxWorker();
   }
 });
 

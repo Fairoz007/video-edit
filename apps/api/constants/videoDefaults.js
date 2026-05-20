@@ -23,7 +23,29 @@ export const MIN_NARRATION_WORDS = Math.round(
 /** Stock/scrape media — prefer assets at least this wide (4K-friendly). */
 export const MIN_IMAGE_WIDTH = parseInt(process.env.MIN_IMAGE_WIDTH || '1920', 10);
 
-export const SCRIPT_SECTION_IDS = ['intro', 'history', 'growth', 'modern', 'outro'];
+/** Cinematic documentary arc — order matters for pacing and TTS. */
+export const SCRIPT_SECTION_IDS = [
+  'opening',
+  'introduction',
+  'backstory',
+  'rising_action',
+  'revelation',
+  'climax',
+  'conclusion',
+  'ending',
+];
+
+/** Default seconds per section (scaled to TARGET_VIDEO_DURATION_SEC in prompts). */
+export const SCRIPT_SECTION_DURATION_HINTS = {
+  opening: 15,
+  introduction: 18,
+  backstory: 22,
+  rising_action: 35,
+  revelation: 25,
+  climax: 32,
+  conclusion: 18,
+  ending: 15,
+};
 
 /** Walkthrough / Stitch-style screen pacing (seconds per slide). */
 export const WALKTHROUGH_SEC_PER_SCREEN = parseFloat(

@@ -359,6 +359,12 @@ export function getDocumentaryTemplate(templateId) {
   );
 }
 
+/** Intro graphic length in seconds — must match Remotion `introGraphicSec` for subtitle sync. */
+export function getIntroGraphicSec(templateId, fps = 30) {
+  const theme = resolveVisualTheme(getDocumentaryTemplate(templateId));
+  return (theme.intro?.durationFrames ?? 90) / fps;
+}
+
 /** Flatten template into Remotion-friendly theme tokens. */
 export function resolveVisualTheme(template) {
   const t = template || getDocumentaryTemplate(DEFAULT_TEMPLATE_ID);

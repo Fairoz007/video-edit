@@ -3,6 +3,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { getIntroGraphicSec } from '@docuforge/config/documentaryTemplates';
 import { NARRATION_WORDS_PER_MINUTE } from '../constants/videoDefaults.js';
 
 function formatSrtTime(seconds) {
@@ -29,30 +30,36 @@ function wrapText(text, maxLen = 42) {
   return lines.join('\n');
 }
 
+function resolveIntroOffsetSec(options = {}) {
+  if (options.introOffsetSec != null) return options.introOffsetSec;
+  if (options.templateId) return getIntroGraphicSec(options.templateId, options.fps || 30);
+  return 0;
+}
+
 /** Word-by-word cues for kinetic subtitles (Remotion KineticSubtitles). */
 export function buildWordCues(sections, options = {}) {
-  const introOffset = options.introOffsetSec || 0;
-  let cursor = introOffset;
+  const introOffset = resolveIntroOffsetSec(options);
   const cues = [];
 
   for (const section of sections) {
     const words = (section.narration || '').split(/\s+/).filter(Boolean);
     if (!words.length) continue;
 
-    const sectionDuration = section.durationEstimate || 12;
+    const sectionDuration = Math.max(0.5, section.durationEstimate || 12);
+    const sectionStart = cues.length ? cues[cues.length - 1].endSec + 0.04 : introOffset;
     const timePerWord = sectionDuration / words.length;
 
-    for (const word of words) {
-      const duration = Math.max(0.14, Math.min(timePerWord, 0.5));
+    for (let i = 0; i < words.length; i++) {
+      const startSec = sectionStart + i * timePerWord;
+      const endSec =
+        i === words.length - 1 ? sectionStart + sectionDuration : startSec + timePerWord;
       cues.push({
-        word,
-        startSec: cursor,
-        endSec: cursor + duration,
+        word: words[i],
+        startSec,
+        endSec,
         sectionId: section.id,
       });
-      cursor += duration;
     }
-    cursor += 0.06;
   }
 
   if (options.audioDurationSec && cues.length) {
@@ -72,7 +79,7 @@ export function buildWordCues(sections, options = {}) {
 
 export function buildSubtitleCues(sections, options = {}) {
   const wordsPerSecond = (options.wordsPerMinute || NARRATION_WORDS_PER_MINUTE) / 60;
-  const introOffset = options.introOffsetSec || 0;
+  const introOffset = resolveIntroOffsetSec(options);
   let cursor = introOffset;
   const cues = [];
 
@@ -139,7 +146,7 @@ function scaleCuesToDuration(cues, audioDurationSec, introOffset = 0) {
 
 export function writeSubtitles(sections, outputDir, options = {}) {
   fs.mkdirSync(outputDir, { recursive: true });
-  const introOffset = options.introOffsetSec || 0;
+  const introOffset = resolveIntroOffsetSec(options);
   let cues = buildSubtitleCues(sections, options);
 
   if (options.audioDurationSec) {

@@ -46,6 +46,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     options.videoOnly === true || options.editMode === 'video-only';
   const visualTheme = options.visualTheme || null;
   const templateId = options.templateId || 'template_cinematic_docuforge';
+  const introGraphicSec = options.introGraphicSec ?? REMOTION_INTRO_GRAPHIC_SEC;
   const TRANSITIONS = transitionListForTemplate(visualTheme);
   const maxClipsPerSection = maxClipsForTemplate(templateId);
   const globalLut = visualTheme?.globalLut || 'cinematic_teal_orange';
@@ -77,7 +78,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
 
   const scenes = [];
   let mediaIndex = 0;
-  let timeCursor = REMOTION_INTRO_GRAPHIC_SEC;
+  let timeCursor = introGraphicSec;
 
   for (let i = 0; i < sectionCount; i++) {
     const section = balancedSections[i];
@@ -128,13 +129,13 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     }
   }
 
-  let contentEnd = Math.max(0, timeCursor - REMOTION_INTRO_GRAPHIC_SEC);
+  let contentEnd = Math.max(0, timeCursor - introGraphicSec);
   if (contentEnd < contentTarget * 0.95 && scenes.length > 0) {
     const stretch = contentTarget / Math.max(contentEnd, 1);
     for (const scene of scenes) {
       scene.duration = Math.max(2.5, scene.duration * stretch);
     }
-    timeCursor = REMOTION_INTRO_GRAPHIC_SEC;
+    timeCursor = introGraphicSec;
     for (const scene of scenes) {
       scene.start = timeCursor;
       timeCursor += scene.duration;
@@ -142,8 +143,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     contentEnd = contentTarget;
   }
 
-  const totalDuration =
-    REMOTION_INTRO_GRAPHIC_SEC + contentEnd + REMOTION_OUTRO_GRAPHIC_SEC;
+  const totalDuration = introGraphicSec + contentEnd + REMOTION_OUTRO_GRAPHIC_SEC;
 
   const syncedSections = syncSectionsToVideoTimeline(balancedSections, scenes, contentEnd);
 

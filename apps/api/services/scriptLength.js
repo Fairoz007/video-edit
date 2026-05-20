@@ -26,8 +26,9 @@ export function expandScriptSections(sections, researchText = '') {
   while (total < MIN_NARRATION_WORDS && factIdx < facts.length * 3) {
     const fact = facts[factIdx % Math.max(facts.length, 1)];
     const target =
-      expanded.find((s) => s.id === 'modern') ||
-      expanded.find((s) => s.id === 'growth') ||
+      expanded.find((s) => s.id === 'rising_action') ||
+      expanded.find((s) => s.id === 'climax') ||
+      expanded.find((s) => s.id === 'backstory') ||
       expanded[Math.floor(expanded.length / 2)];
 
     if (target && fact) {
@@ -39,17 +40,17 @@ export function expandScriptSections(sections, researchText = '') {
   }
 
   const fillerSentences = [
-    'This chapter shaped the broader narrative in ways historians still debate today, connecting past decisions to the world we see now.',
-    'Archives, oral histories, and contemporary reporting together paint a picture that is richer than any single headline.',
-    'Understanding this period means weighing context, culture, and the incentives that moved people and institutions at the time.',
-    'The details matter because they explain not only what happened, but why those events still echo in the present.',
-    'Scholars continue to revisit primary sources, adjusting the story as new evidence comes to light.',
-    'For viewers following along, keep these threads in mind as we move from origins through growth into the modern era.',
+    'The weight of that moment still lingers — not in dates on a page, but in the lives reshaped around it.',
+    'Listen closely, and you can hear the thread connecting then to now, thin but unbroken.',
+    'History rarely moves in straight lines; it bends through doubt, courage, and accidents no one planned for.',
+    'What looked inevitable from a distance was, up close, a series of fragile choices under pressure.',
+    'The archive remembers what headlines forget: hesitation, hope, and the silence between decisions.',
+    'To hold this story whole, you have to feel its rhythm — slow where it breathes, sharp where it breaks.',
   ];
 
   let fillerIdx = 0;
   while (total < MIN_NARRATION_WORDS) {
-    const targets = expanded.filter((s) => s.id !== 'intro' && s.id !== 'outro');
+    const targets = expanded.filter((s) => s.id !== 'opening' && s.id !== 'ending');
     if (!targets.length) break;
     const target = targets[fillerIdx % targets.length];
     const extra = facts.length

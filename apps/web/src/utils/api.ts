@@ -162,6 +162,11 @@ export interface ScriptSection {
   title: string;
   narration: string;
   durationEstimate: number;
+  sceneHeading?: string;
+  visualDirection?: string;
+  brollSuggestions?: string[];
+  audioDesign?: string;
+  transitionNotes?: string;
 }
 
 export interface TimelineScene {

@@ -1,5 +1,5 @@
 /**
- * Auto-search and download high-resolution (4K-friendly) media from stock APIs.
+ * Auto-search and download HD stock video from Pexels / Pixabay APIs.
  */
 import axios from 'axios';
 import fs from 'fs';
@@ -8,127 +8,165 @@ import crypto from 'crypto';
 import { pipeline } from 'stream/promises';
 import { MIN_IMAGE_WIDTH } from '../constants/videoDefaults.js';
 
-const PEXELS = 'https://api.pexels.com/v1';
-const PIXABAY = 'https://pixabay.com/api/';
-const UNSPLASH = 'https://api.unsplash.com';
+const PEXELS_VIDEOS = 'https://api.pexels.com/videos';
+const PIXABAY_VIDEOS = 'https://pixabay.com/api/videos/';
+
+const MIN_VIDEO_WIDTH = MIN_IMAGE_WIDTH;
+const VIDEO_DOWNLOAD_TIMEOUT_MS = 180_000;
 
 function hashUrl(url) {
   return crypto.createHash('md5').update(url).digest('hex').slice(0, 12);
 }
 
 async function downloadFile(url, dest) {
-  const response = await axios.get(url, { responseType: 'stream', timeout: 60000 });
+  const response = await axios.get(url, {
+    responseType: 'stream',
+    timeout: VIDEO_DOWNLOAD_TIMEOUT_MS,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
+  });
   await pipeline(response.data, fs.createWriteStream(dest));
   return dest;
 }
 
-async function searchPexels(query, perPage = 8) {
+/** Prefer widest MP4 (HD/4K) from Pexels `video_files`. */
+function pickBestPexelsFile(videoFiles = []) {
+  const mp4 = videoFiles.filter(
+    (f) => f?.link && (!f.file_type || /mp4/i.test(f.file_type)),
+  );
+  const candidates = mp4.length ? mp4 : videoFiles.filter((f) => f?.link);
+  if (!candidates.length) return null;
+
+  return candidates.sort((a, b) => {
+    const aw = a.width || 0;
+    const bw = b.width || 0;
+    if (bw !== aw) return bw - aw;
+    const rank = (q) => (q === 'uhd' || q === '4k' ? 3 : q === 'hd' ? 2 : 1);
+    return rank(b.quality) - rank(a.quality);
+  })[0];
+}
+
+function mapPexelsVideo(v) {
+  const file = pickBestPexelsFile(v.video_files);
+  if (!file?.link) return null;
+  return {
+    source: 'pexels',
+    type: 'video',
+    url: file.link,
+    thumb: v.image,
+    width: file.width || v.width,
+    height: file.height || v.height,
+    duration: v.duration,
+    quality: (file.width || 0) >= 3840 ? '4k' : (file.width || 0) >= 1920 ? 'hd' : 'sd',
+    photographer: v.user?.name,
+    id: `pexels-v-${v.id}`,
+  };
+}
+
+async function searchPexelsVideos(query, perPage = 8) {
   const key = process.env.PEXELS_API_KEY;
   if (!key) return [];
-  const { data } = await axios.get(`${PEXELS}/search`, {
-    params: { query, per_page: perPage },
+  const { data } = await axios.get(`${PEXELS_VIDEOS}/search`, {
+    params: { query, per_page: perPage, orientation: 'landscape' },
     headers: { Authorization: key },
+    timeout: 30_000,
   });
-  return (data.photos || []).map((p) => ({
-    source: 'pexels',
-    type: 'image',
-    url: p.src.original || p.src.large2x || p.src.large,
-    thumb: p.src.medium,
-    width: p.width,
-    height: p.height,
-    quality: '4k',
-    photographer: p.photographer,
-    id: `pexels-${p.id}`,
-  })).concat(
-    (data.videos || []).map((v) => ({
-      source: 'pexels',
-      type: 'video',
-      url: v.video_files?.[0]?.link,
-      thumb: v.image,
-      id: `pexels-v-${v.id}`,
-    })).filter((v) => v.url),
+  return (data.videos || []).map(mapPexelsVideo).filter(Boolean);
+}
+
+/** Pixabay may return empty `large.url` when 4K is unavailable — skip zero-size renditions. */
+function isUsablePixabayRendition(rendition) {
+  return Boolean(
+    rendition?.url?.trim() &&
+      (rendition.size == null || rendition.size > 0) &&
+      (rendition.width == null || rendition.width > 0),
   );
 }
 
-async function searchPixabay(query, perPage = 8) {
+function pickBestPixabayFile(videos = {}) {
+  const order = ['large', 'medium', 'small', 'tiny'];
+  let best = null;
+  for (const tier of order) {
+    const f = videos[tier];
+    if (!isUsablePixabayRendition(f)) continue;
+    if (!best || (f.width || 0) > (best.width || 0)) {
+      best = { ...f, tier };
+    }
+  }
+  return best;
+}
+
+function mapPixabayVideo(hit) {
+  const file = pickBestPixabayFile(hit.videos);
+  if (!file?.url) return null;
+
+  const w = file.width || 0;
+  const quality = w >= 3840 ? '4k' : w >= 1920 ? 'hd' : 'sd';
+
+  return {
+    source: 'pixabay',
+    type: 'video',
+    url: file.url,
+    thumb: file.thumbnail,
+    width: file.width,
+    height: file.height,
+    duration: hit.duration,
+    quality,
+    id: `pixabay-v-${hit.id}`,
+    pageURL: hit.pageURL,
+    tags: hit.tags,
+    videoType: hit.type,
+    photographer: hit.user,
+    attribution: hit.user ? `Video by ${hit.user} on Pixabay` : 'Pixabay',
+  };
+}
+
+async function searchPixabayVideos(query, perPage = 8) {
   const key = process.env.PIXABAY_API_KEY;
   if (!key) return [];
-  const { data } = await axios.get(PIXABAY, {
-    params: { key, q: query, per_page: perPage, image_type: 'photo' },
+
+  const q = String(query).trim().slice(0, 100);
+  if (!q) return [];
+
+  const { data } = await axios.get(PIXABAY_VIDEOS, {
+    params: {
+      key,
+      q,
+      per_page: Math.min(Math.max(perPage, 3), 200),
+      video_type: 'film',
+      min_width: MIN_VIDEO_WIDTH,
+      safesearch: true,
+      order: 'popular',
+      lang: 'en',
+    },
+    timeout: 30_000,
   });
-  return (data.hits || []).map((h) => ({
-    source: 'pixabay',
-    type: h.type === 'film' ? 'video' : 'image',
-    url: h.fullHDURL || h.largeImageURL || h.webformatURL,
-    thumb: h.previewURL,
-    width: h.imageWidth,
-    height: h.imageHeight,
-    quality: '4k',
-    id: `pixabay-${h.id}`,
-  }));
+
+  if (!data.totalHits) return [];
+
+  return (data.hits || []).map(mapPixabayVideo).filter(Boolean);
 }
 
-function unsplashHeaders() {
-  const key = process.env.UNSPLASH_ACCESS_KEY;
-  if (!key) return null;
-  return { Authorization: `Client-ID ${key}` };
-}
-
-async function searchUnsplash(query, perPage = 8) {
-  const headers = unsplashHeaders();
-  if (!headers) return [];
-  const { data } = await axios.get(`${UNSPLASH}/search/photos`, {
-    params: { query, per_page: perPage },
-    headers,
-  });
-  return (data.results || []).map((p) => ({
-    source: 'unsplash',
-    type: 'image',
-    url: p.urls.full || p.urls.raw || p.urls.regular,
-    thumb: p.urls.small,
-    width: p.width,
-    height: p.height,
-    quality: '4k',
-    id: `unsplash-${p.id}`,
-    photoId: p.id,
-    downloadLocation: p.links?.download_location,
-    photographer: p.user?.name,
-    attribution: `Photo by ${p.user?.name} on Unsplash`,
-  }));
-}
-
-/** Unsplash API: trigger download count before fetching the image. */
-async function triggerUnsplashDownload(item) {
-  const headers = unsplashHeaders();
-  if (!headers || !item.photoId) return item.url;
-  try {
-    const endpoint =
-      item.downloadLocation || `${UNSPLASH}/photos/${item.photoId}/download`;
-    const { data } = await axios.get(endpoint, { headers });
-    return data.url || item.url;
-  } catch {
-    return item.url;
-  }
-}
-
-/** Prefer 4K / large assets for documentary B-roll. */
+/** Prefer wide HD clips for documentary B-roll. */
 function mediaQualityScore(item) {
   const w = item.width || 0;
   const h = item.height || 0;
   const pixels = w * h;
-  if (pixels >= 3840 * 2160) return 1000 + pixels;
-  if (w >= MIN_IMAGE_WIDTH || h >= 1080) return 500 + pixels;
-  if (item.quality === '4k') return 400;
-  return pixels;
+  let score = pixels;
+  if (w >= 3840 || h >= 2160) score += 2000;
+  else if (w >= MIN_VIDEO_WIDTH || h >= 1080) score += 1000;
+  if (item.duration && item.duration >= 8) score += 200;
+  if (item.quality === '4k') score += 400;
+  else if (item.quality === 'hd') score += 200;
+  return score;
 }
 
 export async function searchMedia(query, options = {}) {
   const { limit = 20 } = options;
-  const searchQuery = `${query} 4K ultra HD documentary`.trim();
+  const searchQuery = `${query} b-roll`.trim();
   const results = await Promise.allSettled([
-    searchPexels(searchQuery, 8),
-    searchPixabay(searchQuery, 8),
-    searchUnsplash(searchQuery, 8),
+    searchPexelsVideos(searchQuery, 10),
+    searchPixabayVideos(searchQuery, 10),
   ]);
 
   const merged = [];
@@ -137,6 +175,7 @@ export async function searchMedia(query, options = {}) {
   for (const r of results) {
     if (r.status !== 'fulfilled') continue;
     for (const item of r.value) {
+      if (item.type !== 'video') continue;
       const key = item.url;
       if (!key || seen.has(key)) continue;
       seen.add(key);
@@ -155,8 +194,8 @@ export async function downloadMediaAssets(items, destDir) {
   const seenHashes = new Set();
 
   for (const item of items) {
-    if (!item.url) continue;
-    const ext = item.type === 'video' ? '.mp4' : '.jpg';
+    if (!item.url || item.type !== 'video') continue;
+    const ext = '.mp4';
     const filename = `${hashUrl(item.url)}${ext}`;
     const dest = path.join(destDir, filename);
 
@@ -165,16 +204,14 @@ export async function downloadMediaAssets(items, destDir) {
 
     try {
       if (!fs.existsSync(dest)) {
-        const fetchUrl =
-          item.source === 'unsplash' ? await triggerUnsplashDownload(item) : item.url;
-        await downloadFile(fetchUrl, dest);
+        await downloadFile(item.url, dest);
       }
       const stat = fs.statSync(dest);
-      if (item.type !== 'video' && stat.size < 12000) {
+      if (stat.size < 48_000) {
         fs.unlinkSync(dest);
         continue;
       }
-      manifest.push({ ...item, localPath: dest, filename, bytes: stat.size });
+      manifest.push({ ...item, type: 'video', localPath: dest, filename, bytes: stat.size });
     } catch (err) {
       console.warn(`[mediaSearch] Failed to download ${item.url}:`, err.message);
     }

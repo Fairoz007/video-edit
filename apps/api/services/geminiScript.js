@@ -47,7 +47,7 @@ export async function generateScriptWithGemini({ topic, researchText, sourceMeta
           },
         ],
         generationConfig: {
-          temperature: 0.65,
+          temperature: 0.75,
           maxOutputTokens: 8192,
           responseMimeType: 'application/json',
         },

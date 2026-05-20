@@ -1,5 +1,5 @@
 /**
- * Solid-color placeholder images when stock/scrape media is missing or invalid.
+ * Solid-color placeholder clips when stock/scrape media is missing or invalid.
  */
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -24,6 +24,8 @@ const PLACEHOLDER_COLORS = [
   '0x706fd3',
 ];
 
+const PLACEHOLDER_DURATION_SEC = 4;
+
 export async function createPlaceholderAssets(mediaDir, count = 12) {
   const ffmpegBin = findFfmpegPath();
   if (!ffmpegBin) return [];
@@ -32,7 +34,7 @@ export async function createPlaceholderAssets(mediaDir, count = 12) {
   const assets = [];
 
   for (let i = 0; i < count; i++) {
-    const filename = `placeholder-${String(i).padStart(2, '0')}.jpg`;
+    const filename = `placeholder-${String(i).padStart(2, '0')}.mp4`;
     const dest = path.join(mediaDir, filename);
     const color = PLACEHOLDER_COLORS[i % PLACEHOLDER_COLORS.length];
 
@@ -44,23 +46,28 @@ export async function createPlaceholderAssets(mediaDir, count = 12) {
           '-f',
           'lavfi',
           '-i',
-          `color=c=${color}:s=1920x1080:d=1`,
-          '-frames:v',
-          '1',
+          `color=c=${color}:s=1920x1080:d=${PLACEHOLDER_DURATION_SEC}`,
+          '-c:v',
+          'libx264',
+          '-pix_fmt',
+          'yuv420p',
+          '-t',
+          String(PLACEHOLDER_DURATION_SEC),
           dest,
         ],
-        { timeout: 30_000 },
+        { timeout: 60_000 },
       );
     }
 
     if (fs.existsSync(dest)) {
       assets.push({
         source: 'placeholder',
-        type: 'image',
+        type: 'video',
         localPath: dest,
         filename,
         id: `placeholder-${i}`,
         quality: '1080p',
+        duration: PLACEHOLDER_DURATION_SEC,
       });
     }
   }

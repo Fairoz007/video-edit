@@ -31,8 +31,8 @@ export async function generateScriptWithGroq({ topic, researchText, sourceMeta }
         { role: 'system', content: SCRIPT_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.65,
-      max_tokens: 4096,
+      temperature: 0.75,
+      max_tokens: 8192,
       response_format: { type: 'json_object' },
     },
     {

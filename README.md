@@ -10,7 +10,7 @@ Automatic documentary video generator — **no AI APIs** for scripting. Uses rul
 | Backend | Node.js, Express |
 | Render | FFmpeg, Remotion, MoviePy (Python) |
 | NLP | compromise.js, keyword-extractor |
-| Media | Pexels, Pixabay, Unsplash APIs |
+| Media | Pexels & Pixabay stock video APIs |
 
 ## Monorepo layout
 
@@ -83,7 +83,7 @@ Then start again. Do **not** paste shell comments (`# Terminal 1`) on the same l
 ## Pipeline
 
 1. **Topic / URL** → rule-based script + Wikipedia facts  
-2. **Keywords** → Pexels / Pixabay / Unsplash download  
+2. **Keywords** → Pexels / Pixabay stock video download  
 3. **Offline TTS** → narration MP3  
 4. **SRT** subtitles  
 5. **MoviePy** → clip sequence + audio sync  

@@ -8,6 +8,7 @@ import {
   TARGET_VIDEO_DURATION_SEC,
   INTRO_DURATION_SEC,
   OUTRO_DURATION_SEC,
+  SCRIPT_SECTION_DURATION_HINTS,
 } from '../constants/videoDefaults.js';
 import { generateScriptWithGroq, isGroqConfigured } from './groqScript.js';
 import { generateScriptWithGemini, isGeminiConfigured } from './geminiScript.js';
@@ -15,47 +16,110 @@ import { expandScriptSections } from './scriptLength.js';
 import { isValidHttpUrl, normalizeHttpUrl } from '../utils/urlValidate.js';
 
 const FALLBACK_SECTIONS = {
-  intro: {
-    title: 'Introduction',
+  opening: {
+    sceneHeading: 'Before the Story Begins',
+    title: 'Cold Open',
+    visualDirection: 'Slow push-in on a wide landscape at dusk; shallow depth of field.',
+    brollSuggestions: ['cinematic aerial landscape dusk', 'silhouette figure horizon'],
+    audioDesign: 'Low drone pad; distant wind; single piano note.',
+    transitionNotes: 'Fade in from black; hold on silence before first word.',
     templates: [
-      'Welcome. In the next few minutes, we dive deep into the story of {topic}.',
-      'Stay with us — this journey covers origins, growth, and where things stand today.',
+      'Some stories do not announce themselves. They arrive like weather — quiet at first, then impossible to ignore.',
+      'This is the story of {topic}. And it begins long before anyone thought to name it.',
     ],
-    duration: INTRO_DURATION_SEC,
+    duration: SCRIPT_SECTION_DURATION_HINTS.opening ?? INTRO_DURATION_SEC,
   },
-  history: {
-    title: 'Origins',
+  introduction: {
+    sceneHeading: 'The Central Question',
+    title: 'Why It Matters',
+    visualDirection: 'Medium shots of people, places, or objects tied to the subject; natural light.',
+    brollSuggestions: ['documentary portrait natural light', 'urban detail close-up'],
+    audioDesign: 'Sparse strings; room tone underneath.',
+    transitionNotes: 'Match cut from wide to intimate.',
     templates: [
-      'The origins of {topic} trace back to a world that looked very different.',
-      'Early records suggest that {fact}',
-    ],
-    duration: 35,
-  },
-  growth: {
-    title: 'Rise & Growth',
-    templates: [
-      'Expansion marked a turning point for {topic}.',
+      'To understand {topic}, you have to sit with a question that will not go away.',
       '{fact}',
-      'Innovation and ambition drove unprecedented momentum.',
     ],
-    duration: 40,
+    duration: SCRIPT_SECTION_DURATION_HINTS.introduction ?? 18,
   },
-  modern: {
-    title: 'Today',
+  backstory: {
+    sceneHeading: 'Roots in Shadow',
+    title: 'Backstory',
+    visualDirection: 'Archival texture, grain, slower camera; maps or documents if relevant.',
+    brollSuggestions: ['vintage archive footage', 'old photographs documentary'],
+    audioDesign: 'Muted percussion; tape hiss texture optional.',
+    transitionNotes: 'Dissolve between eras.',
     templates: [
-      'Today, {topic} stands at the intersection of tradition and transformation.',
+      'The past does not stay past. For {topic}, the earliest chapters still pull on the present.',
       '{fact}',
-      'The modern era continues to write new chapters in this narrative.',
     ],
-    duration: 45,
+    duration: SCRIPT_SECTION_DURATION_HINTS.backstory ?? 22,
   },
-  outro: {
-    title: 'Outro',
+  rising_action: {
+    sceneHeading: 'Pressure Builds',
+    title: 'Rising Action',
+    visualDirection: 'Handheld energy, quicker cuts, contrast rising.',
+    brollSuggestions: ['crowd movement timelapse', 'dramatic sky clouds'],
+    audioDesign: 'Rhythm enters; heartbeat-adjacent low pulse.',
+    transitionNotes: 'Smash cuts on key words; L-cuts on narration.',
     templates: [
-      'That wraps our look at {topic}. If this story resonated with you, hit the like button so more viewers can find it.',
-      'Subscribe for more documentaries like this — we publish new deep dives regularly. Thank you for watching.',
+      'Then the ground shifted. What had been background noise became the main event.',
+      '{fact}',
+      'Momentum gathered — and with it, stakes no one could pretend were small.',
     ],
-    duration: OUTRO_DURATION_SEC,
+    duration: SCRIPT_SECTION_DURATION_HINTS.rising_action ?? 35,
+  },
+  revelation: {
+    sceneHeading: 'The Unveiling',
+    title: 'Revelation',
+    visualDirection: 'Hold on faces; stillness after motion; light change.',
+    brollSuggestions: ['dramatic reveal light window', 'eyes close-up documentary'],
+    audioDesign: 'Music drops to near-silence; one sustained note.',
+    transitionNotes: 'Slow zoom on pivotal image.',
+    templates: [
+      'And then — the detail that changes everything. Not louder. Clearer.',
+      '{fact}',
+    ],
+    duration: SCRIPT_SECTION_DURATION_HINTS.revelation ?? 25,
+  },
+  climax: {
+    sceneHeading: 'Breaking Point',
+    title: 'Climax',
+    visualDirection: 'Peak contrast, full frame action or emotional close-up.',
+    brollSuggestions: ['dramatic climax cinematic', 'storm light documentary'],
+    audioDesign: 'Full score swell; impact SFX sparingly.',
+    transitionNotes: 'Crossfade to white flash optional, then back.',
+    templates: [
+      'This was the moment {topic} stopped being an idea and became a force — felt in real rooms, real lives.',
+      '{fact}',
+    ],
+    duration: SCRIPT_SECTION_DURATION_HINTS.climax ?? 32,
+  },
+  conclusion: {
+    sceneHeading: 'Aftermath',
+    title: 'Conclusion',
+    visualDirection: 'Softer light, wider frames, breathing room.',
+    brollSuggestions: ['sunrise calm landscape', 'empty street morning'],
+    audioDesign: 'Warm strings resolve; ambience returns.',
+    transitionNotes: 'Gentle dissolve between shots.',
+    templates: [
+      'When the noise faded, what remained was not a headline — but a changed landscape around {topic}.',
+      '{fact}',
+    ],
+    duration: SCRIPT_SECTION_DURATION_HINTS.conclusion ?? 18,
+  },
+  ending: {
+    sceneHeading: 'Last Light',
+    title: 'Ending',
+    visualDirection: 'Single powerful image; hold; fade toward black.',
+    brollSuggestions: ['cinematic sunset silhouette', 'night city lights bokeh'],
+    audioDesign: 'Music resolves to silence; one final ambient texture.',
+    transitionNotes: 'Fade to black; end on held image.',
+    templates: [
+      'Stories like this do not end. They echo — in what we choose to remember, and what we dare to do next.',
+      'If {topic} taught us anything, it is that the future is still being written. The question is who holds the pen.',
+    ],
+    duration: SCRIPT_SECTION_DURATION_HINTS.ending ?? OUTRO_DURATION_SEC,
   },
 };
 
@@ -169,6 +233,11 @@ function generateFallbackScript(primaryTopic, researchText, sourceMeta) {
     sections.push({
       id,
       title: cfg.title,
+      sceneHeading: cfg.sceneHeading,
+      visualDirection: cfg.visualDirection,
+      brollSuggestions: cfg.brollSuggestions,
+      audioDesign: cfg.audioDesign,
+      transitionNotes: cfg.transitionNotes,
       narration,
       durationEstimate: cfg.duration,
     });

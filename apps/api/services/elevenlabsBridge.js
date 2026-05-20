@@ -4,6 +4,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { chunkText } from '../utils/chunkText.js';
 
 const API_BASE = 'https://api.elevenlabs.io/v1';
 
@@ -170,35 +171,6 @@ export async function listElevenLabsVoices(force = false) {
 function rateToElevenLabsSpeed(rate = 175) {
   const wpm = Math.min(400, Math.max(80, Number(rate) || 175));
   return Math.min(1.2, Math.max(0.7, wpm / 175));
-}
-
-function chunkText(text, maxLen = 4500) {
-  const trimmed = (text || '').trim();
-  if (!trimmed) return [];
-  if (trimmed.length <= maxLen) return [trimmed];
-
-  const chunks = [];
-  const paragraphs = trimmed.split(/\n\n+/);
-  let buf = '';
-
-  for (const para of paragraphs) {
-    const next = buf ? `${buf}\n\n${para}` : para;
-    if (next.length <= maxLen) {
-      buf = next;
-      continue;
-    }
-    if (buf) chunks.push(buf);
-    if (para.length <= maxLen) {
-      buf = para;
-      continue;
-    }
-    for (let i = 0; i < para.length; i += maxLen) {
-      chunks.push(para.slice(i, i + maxLen));
-    }
-    buf = '';
-  }
-  if (buf) chunks.push(buf);
-  return chunks;
 }
 
 export async function synthesizeElevenLabs({

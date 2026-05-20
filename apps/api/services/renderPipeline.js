@@ -10,10 +10,7 @@ import { searchMedia, downloadMediaAssets } from './mediaSearch.js';
 import { scrapeUrlForVideo } from '../scraper/playwrightScraper.js';
 import { generateDocumentaryScript } from './scriptGenerator.js';
 import { generateNarrationForTargetDuration } from './voiceGenerator.js';
-import {
-  REMOTION_INTRO_GRAPHIC_SEC,
-  TARGET_VIDEO_DURATION_SEC,
-} from '../constants/videoDefaults.js';
+import { TARGET_VIDEO_DURATION_SEC } from '../constants/videoDefaults.js';
 import { writeSubtitles } from './subtitleGenerator.js';
 import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
@@ -25,6 +22,7 @@ import {
 } from '../utils/sectionTiming.js';
 import {
   getDocumentaryTemplate,
+  getIntroGraphicSec,
   resolveVisualTheme,
 } from '@docuforge/config/documentaryTemplates';
 import { verifyVideoFile } from '../utils/videoValidate.js';
@@ -145,10 +143,15 @@ export class RenderPipeline {
       });
       project.keywords = keywords;
 
-      report('media', 20, 'Searching and downloading 4K media...');
+      report('media', 20, 'Searching and downloading stock video...');
+      const brollFromScript = (script.sections || [])
+        .flatMap((s) => s.brollSuggestions || [])
+        .map((t) => String(t).trim())
+        .filter(Boolean);
       const searchTerms = [
-        `${script.topic} 4K`,
-        ...keywords.keywords.slice(0, 5).map((k) => `${k} 4K documentary`),
+        script.topic,
+        ...brollFromScript.slice(0, 6),
+        ...keywords.keywords.slice(0, 5),
       ];
       let allMedia = [...scrapedMedia];
       for (const term of searchTerms.slice(0, 4)) {
@@ -214,19 +217,8 @@ export class RenderPipeline {
         fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
       }
 
-      // 5. Subtitles (animated in Remotion + SRT fallback)
-      if (videoOnly) {
-        report('subtitles', 45, 'Skipped — video-only edit');
-        project.subtitleCues = [];
-      } else {
-        report('subtitles', 45, 'Creating animated subtitle cues...');
-        const { cues, wordCues } = writeSubtitles(script.sections, path.join(dir, 'subtitles'), {
-          introOffsetSec: REMOTION_INTRO_GRAPHIC_SEC,
-          audioDurationSec: effectiveNarrationSec,
-        });
-        project.subtitleCues = cues;
-        project.wordCues = wordCues;
-      }
+      const templateId = project.input?.templateId;
+      const introGraphicSec = getIntroGraphicSec(templateId);
 
       const videoStyle = project.input?.videoStyle || 'documentary';
       project.videoStyle = videoStyle;
@@ -250,7 +242,7 @@ export class RenderPipeline {
           totalDuration: walkthrough.totalDuration,
         };
       } else {
-        const docTemplate = getDocumentaryTemplate(project.input?.templateId);
+        const docTemplate = getDocumentaryTemplate(templateId);
         const visualTheme = resolveVisualTheme(docTemplate);
         project.visualTemplate = docTemplate;
         timeline = buildTimeline(script, media, tracks, {
@@ -259,6 +251,7 @@ export class RenderPipeline {
           editMode: project.input?.editMode,
           templateId: docTemplate.id,
           visualTheme,
+          introGraphicSec,
         });
         if (timeline.sections?.length) {
           script.sections = timeline.sections;
@@ -268,6 +261,26 @@ export class RenderPipeline {
       project.timeline = timeline;
       fs.mkdirSync(path.join(dir, 'timeline'), { recursive: true });
       fs.writeFileSync(path.join(dir, 'timeline', 'timeline.json'), JSON.stringify(timeline, null, 2));
+
+      // 5. Subtitles — after timeline; intro offset matches template (audio starts after intro)
+      if (videoOnly) {
+        report('subtitles', 45, 'Skipped — video-only edit');
+        project.subtitleCues = [];
+        project.wordCues = [];
+      } else {
+        report('subtitles', 45, 'Creating animated subtitle cues...');
+        const subtitleSections = syncSectionDurationsFromAudio(
+          script.sections,
+          effectiveNarrationSec,
+        );
+        const { cues, wordCues } = writeSubtitles(subtitleSections, path.join(dir, 'subtitles'), {
+          templateId: templateId || getDocumentaryTemplate().id,
+          introOffsetSec: introGraphicSec,
+          audioDurationSec: effectiveNarrationSec,
+        });
+        project.subtitleCues = cues;
+        project.wordCues = wordCues;
+      }
       if (walkthrough) {
         fs.writeFileSync(
           path.join(dir, 'timeline', 'walkthrough.json'),

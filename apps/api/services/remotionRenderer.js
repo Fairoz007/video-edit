@@ -14,6 +14,7 @@ import {
 } from '../constants/videoDefaults.js';
 import {
   getDocumentaryTemplate,
+  getIntroGraphicSec,
   resolveVisualTheme,
 } from '@docuforge/config/documentaryTemplates';
 import { verifyVideoFile } from '../utils/videoValidate.js';
@@ -150,7 +151,7 @@ export function buildRemotionProps(project) {
   const template = getDocumentaryTemplate(project.input?.templateId);
   const visualTheme = resolveVisualTheme(template);
   const fps = 30;
-  const introSec = visualTheme.intro.durationFrames / fps;
+  const introSec = getIntroGraphicSec(template.id, fps);
 
   const scenes =
     timeline?.scenes?.map((s, i) => ({

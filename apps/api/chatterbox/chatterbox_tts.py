@@ -287,6 +287,9 @@ def cmd_warmup(_engine: ChatterboxEngine, payload: dict) -> dict:
 
 
 def serve_loop() -> int:
+    # Process is alive and accepting commands (model loads on first synthesize).
+    emit({"ok": True, "ready": True, "result": {"ready": True, "device": resolve_device()}})
+
     if os.getenv("CHATTERBOX_WARMUP", "0") not in ("0", "false", "no"):
 
         def _warmup() -> None:
