@@ -10,7 +10,8 @@ import { sumSceneDurationsWithTransitions } from './lib/duration';
 import type { TransitionKind } from './lib/transitions';
 import type { WalkthroughProps } from './types';
 
-const DEFAULT_DURATION_SEC = 180;
+/** Studio preview default; render uses calculateMetadata from props. */
+const DEFAULT_DURATION_SEC = 60;
 const FPS = 30;
 const WALKTHROUGH_DEFAULT_SEC_PER_SCREEN = 4;
 

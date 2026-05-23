@@ -85,7 +85,7 @@ export async function verifyReadableVideo(filePath) {
     );
     return stdout.trim() === 'video';
   } catch {
-    return false;
+    return isVideoMagic(magic) && stat.size > MIN_VIDEO_BYTES;
   }
 }
 

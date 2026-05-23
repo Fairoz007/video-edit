@@ -1,8 +1,7 @@
-/** Default documentary length and Remotion timing (seconds). */
-export const TARGET_VIDEO_DURATION_SEC = parseInt(
-  process.env.VIDEO_TARGET_DURATION_SEC || '180',
-  10,
-);
+/** Optional cap/override (seconds). Unset = length follows the script and narration. */
+export const TARGET_VIDEO_DURATION_SEC = process.env.VIDEO_TARGET_DURATION_SEC
+  ? parseInt(process.env.VIDEO_TARGET_DURATION_SEC, 10)
+  : null;
 
 export const INTRO_DURATION_SEC = 20;
 export const OUTRO_DURATION_SEC = 20;
@@ -14,10 +13,6 @@ export const REMOTION_OUTRO_GRAPHIC_SEC = 8;
 export const NARRATION_WORDS_PER_MINUTE = parseInt(
   process.env.NARRATION_WPM || '150',
   10,
-);
-
-export const MIN_NARRATION_WORDS = Math.round(
-  (TARGET_VIDEO_DURATION_SEC / 60) * NARRATION_WORDS_PER_MINUTE,
 );
 
 /** Stock/scrape media — prefer assets at least this wide (4K-friendly). */
@@ -35,7 +30,7 @@ export const SCRIPT_SECTION_IDS = [
   'ending',
 ];
 
-/** Default seconds per section (scaled to TARGET_VIDEO_DURATION_SEC in prompts). */
+/** Default seconds per section when narration is not yet available (proportional arc). */
 export const SCRIPT_SECTION_DURATION_HINTS = {
   opening: 15,
   introduction: 18,

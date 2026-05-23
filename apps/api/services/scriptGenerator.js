@@ -5,14 +5,17 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import {
-  TARGET_VIDEO_DURATION_SEC,
   INTRO_DURATION_SEC,
   OUTRO_DURATION_SEC,
   SCRIPT_SECTION_DURATION_HINTS,
 } from '../constants/videoDefaults.js';
 import { generateScriptWithGroq, isGroqConfigured } from './groqScript.js';
 import { generateScriptWithGemini, isGeminiConfigured } from './geminiScript.js';
-import { expandScriptSections } from './scriptLength.js';
+import {
+  expandScriptSections,
+  estimateScriptDurationSec,
+  syncSectionDurationsFromNarration,
+} from './scriptLength.js';
 import { parseUploadedScriptText } from './scriptTextParser.js';
 import { isValidHttpUrl, normalizeHttpUrl } from '../utils/urlValidate.js';
 
@@ -244,13 +247,9 @@ function generateFallbackScript(primaryTopic, researchText, sourceMeta) {
     });
   }
 
-  const sum = sections.reduce((a, s) => a + s.durationEstimate, 0);
-  const scale = TARGET_VIDEO_DURATION_SEC / sum;
-  for (const s of sections) {
-    s.durationEstimate = Math.round(s.durationEstimate * scale);
-  }
-
-  const expanded = expandScriptSections(sections, researchText);
+  const expanded = syncSectionDurationsFromNarration(
+    expandScriptSections(sections, researchText),
+  );
   const fullNarration = expanded.map((s) => s.narration).join('\n\n');
 
   return {
@@ -261,7 +260,7 @@ function generateFallbackScript(primaryTopic, researchText, sourceMeta) {
       ...sourceMeta,
       generatedAt: new Date().toISOString(),
       engine: 'rule-based-templates',
-      targetDurationSec: TARGET_VIDEO_DURATION_SEC,
+      estimatedDurationSec: estimateScriptDurationSec(expanded),
     },
   };
 }

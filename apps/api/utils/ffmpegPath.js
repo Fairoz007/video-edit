@@ -44,11 +44,11 @@ export function hasFfmpeg() {
   return Boolean(findFfmpegPath());
 }
 
-/** ffprobe next to bundled/system ffmpeg, or on PATH. */
+/** ffprobe next to bundled/system ffmpeg (handles `ffmpeg.exe` on Windows), or on PATH. */
 export function findFfprobePath() {
   const ffmpegBin = findFfmpegPath();
   if (ffmpegBin && ffmpegBin !== 'ffmpeg') {
-    const sibling = ffmpegBin.replace(/ffmpeg$/i, 'ffprobe');
+    const sibling = ffmpegBin.replace(/ffmpeg(\.exe)?$/i, (_, ext) => `ffprobe${ext || ''}`);
     if (fs.existsSync(sibling)) return sibling;
   }
   for (const candidate of [

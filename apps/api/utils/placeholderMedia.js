@@ -49,6 +49,8 @@ export async function createPlaceholderAssets(mediaDir, count = 12) {
           `color=c=${color}:s=1920x1080:d=${PLACEHOLDER_DURATION_SEC}`,
           '-c:v',
           'libx264',
+          '-b:v',
+          '1200k',
           '-pix_fmt',
           'yuv420p',
           '-t',

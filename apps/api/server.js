@@ -93,7 +93,11 @@ const server = app.listen(PORT, '127.0.0.1', () => {
     );
   }
 
-  if (process.env.CHATTERBOX_ONESHOT === '0') {
+  const shouldUseChatterbox =
+    ttsProvider === 'chatterbox' ||
+    (ttsProvider === 'auto' && !process.env.ELEVENLABS_API_KEY);
+
+  if (shouldUseChatterbox && process.env.CHATTERBOX_ONESHOT === '0') {
     prewarmChatterboxWorker();
   }
 });

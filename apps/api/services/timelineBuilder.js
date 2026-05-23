@@ -1,12 +1,13 @@
 /**
- * Auto-build documentary timeline — synced to narration length (~3:00).
+ * Auto-build documentary timeline — synced to narration / script length.
  */
 import {
-  TARGET_VIDEO_DURATION_SEC,
   REMOTION_INTRO_GRAPHIC_SEC,
   REMOTION_OUTRO_GRAPHIC_SEC,
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
+import { estimateScriptDurationSec } from './scriptLength.js';
+import { scoreMediaForSection } from './mediaSearch.js';
 import {
   balanceSectionDurations,
   syncSectionsToVideoTimeline,
@@ -14,8 +15,11 @@ import {
 
 const COLOR_GRADES = ['warm_golden', 'cool_blue', 'cinematic_teal_orange', 'warm_contrast'];
 
-const CONTENT_DURATION =
-  TARGET_VIDEO_DURATION_SEC - REMOTION_INTRO_GRAPHIC_SEC - REMOTION_OUTRO_GRAPHIC_SEC;
+function resolveContentDuration(script, audioDurationSec) {
+  if (audioDurationSec && audioDurationSec > 30) return audioDurationSec;
+  const fromScript = estimateScriptDurationSec(script?.sections || []);
+  return Math.max(30, fromScript);
+}
 
 
 function expandMediaPool(manifest, minClips) {
@@ -26,6 +30,45 @@ function expandMediaPool(manifest, minClips) {
     out.push(manifest[out.length % manifest.length]);
   }
   return out;
+}
+
+function mediaKey(item) {
+  return item?.localPath || item?.url || '';
+}
+
+/** Pick clips for a section — prefer section-tagged stock from script-aligned search. */
+function pickClipsForSection(section, pool, clipCount, usedKeys, globalTerms = []) {
+  const available = pool.filter((m) => {
+    const key = mediaKey(m);
+    return key && !usedKeys.has(key);
+  });
+
+  const ranked = available
+    .map((item) => ({
+      item,
+      score:
+        (item.sectionId === section.id ? 3000 : 0) +
+        (item.sectionRelevance ?? item.relevance ?? 0) +
+        scoreMediaForSection(item, section, globalTerms),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const sectionFirst = ranked.filter((r) => r.item.sectionId === section.id);
+  const source = sectionFirst.length >= clipCount ? sectionFirst : ranked;
+
+  const picked = [];
+  for (let j = 0; j < clipCount && source.length > 0; j++) {
+    const choice =
+      source.find((r) => {
+        const key = mediaKey(r.item);
+        return key && !usedKeys.has(key);
+      }) || source[j % source.length];
+    const key = mediaKey(choice.item);
+    if (!key) continue;
+    usedKeys.add(key);
+    picked.push(choice.item);
+  }
+  return picked;
 }
 
 function transitionListForTemplate(visualTheme) {
@@ -55,14 +98,16 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   const sectionCount = Math.max(1, script.sections.length);
   const audioDurationSec = videoOnly ? null : options.audioDurationSec;
 
-  const contentTarget = Math.max(
-    CONTENT_DURATION,
-    audioDurationSec && audioDurationSec > 30 ? audioDurationSec : 0,
-  );
+  const contentTarget = resolveContentDuration(script, audioDurationSec);
 
   const minClips = Math.max(sectionCount * 2, 12);
   const pool = expandMediaPool(mediaManifest, minClips);
   const mediaPerSection = Math.max(2, Math.floor(pool.length / sectionCount));
+  const globalMatchTerms = [
+    script.topic,
+    ...(script.sections || []).flatMap((s) => s.brollSuggestions || []),
+  ].filter(Boolean);
+  const usedMediaKeys = new Set();
 
   let sections = script.sections;
   if (videoOnly) {
@@ -77,7 +122,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
   const scale = narrationTotal > 0 ? contentTarget / narrationTotal : 1;
 
   const scenes = [];
-  let mediaIndex = 0;
+  let fallbackMediaIndex = 0;
   let timeCursor = introGraphicSec;
 
   for (let i = 0; i < sectionCount; i++) {
@@ -88,9 +133,26 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     const colorGrade = globalLut || COLOR_GRADES[i % COLOR_GRADES.length];
     const isFirstSectionScene = (j) => j === 0;
 
+    let sectionClips = pickClipsForSection(
+      section,
+      pool,
+      clipCount,
+      usedMediaKeys,
+      globalMatchTerms,
+    );
+    if (sectionClips.length < clipCount) {
+      while (sectionClips.length < clipCount) {
+        const asset = pool[fallbackMediaIndex % pool.length];
+        fallbackMediaIndex++;
+        const key = mediaKey(asset);
+        if (!key || usedMediaKeys.has(key)) continue;
+        usedMediaKeys.add(key);
+        sectionClips.push(asset);
+      }
+    }
+
     for (let j = 0; j < clipCount; j++) {
-      const asset = pool[mediaIndex % pool.length];
-      mediaIndex++;
+      const asset = sectionClips[j] || pool[fallbackMediaIndex++ % pool.length];
       const duration = Math.max(2.5, clipDuration);
       const atSectionEdge = j === 0 || j === clipCount - 1;
       scenes.push({
@@ -173,10 +235,23 @@ export function buildWalkthroughTimeline(script, mediaManifest, options = {}) {
   const pool = (mediaManifest || []).filter((m) => m.localPath || m.url);
   const sections = script?.sections || [];
   const maxScreens = options.maxScreens || 16;
-  const assets = pool.slice(0, maxScreens);
+  const usedKeys = new Set();
+  const assets = [];
+  for (const section of sections.slice(0, maxScreens)) {
+    const clips = pickClipsForSection(section, pool, 1, usedKeys);
+    if (clips[0]) assets.push(clips[0]);
+  }
+  while (assets.length < maxScreens && assets.length < pool.length) {
+    const next = pool.find((m) => !usedKeys.has(mediaKey(m)));
+    if (!next) break;
+    usedKeys.add(mediaKey(next));
+    assets.push(next);
+  }
 
   const screens = assets.map((asset, i) => {
-    const section = sections[i % Math.max(1, sections.length)];
+    const section =
+      sections.find((s) => s.id === asset.sectionId) ||
+      sections[i % Math.max(1, sections.length)];
     return {
       id: `screen-${i}`,
       title: section?.title || asset.title || `Screen ${i + 1}`,

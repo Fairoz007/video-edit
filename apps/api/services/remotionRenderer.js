@@ -7,11 +7,11 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
-  TARGET_VIDEO_DURATION_SEC,
   REMOTION_INTRO_GRAPHIC_SEC,
   REMOTION_OUTRO_GRAPHIC_SEC,
   WALKTHROUGH_SEC_PER_SCREEN,
 } from '../constants/videoDefaults.js';
+import { estimateScriptDurationSec } from './scriptLength.js';
 import {
   getDocumentaryTemplate,
   getIntroGraphicSec,
@@ -188,7 +188,11 @@ export function buildRemotionProps(project) {
     chapterBadges,
     visualTheme,
     templateId: template.id,
-    totalDuration: timeline?.totalDuration || TARGET_VIDEO_DURATION_SEC,
+    totalDuration:
+      timeline?.totalDuration ||
+      estimateScriptDurationSec(script?.sections) +
+        (introSec ?? REMOTION_INTRO_GRAPHIC_SEC) +
+        REMOTION_OUTRO_GRAPHIC_SEC,
     introGraphicSec: introSec,
     outroGraphicSec: REMOTION_OUTRO_GRAPHIC_SEC,
     channelName: process.env.CHANNEL_NAME || 'DocuForge',

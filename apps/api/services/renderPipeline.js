@@ -6,11 +6,11 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { projectDir } from '../utils/paths.js';
 import { extractKeywords } from './keywordExtractor.js';
-import { searchMedia, downloadMediaAssets } from './mediaSearch.js';
+import { searchMediaForScript, downloadMediaAssets } from './mediaSearch.js';
 import { scrapeUrlForVideo } from '../scraper/playwrightScraper.js';
 import { generateDocumentaryScript } from './scriptGenerator.js';
 import { generateNarrationForTargetDuration } from './voiceGenerator.js';
-import { TARGET_VIDEO_DURATION_SEC } from '../constants/videoDefaults.js';
+import { estimateScriptDurationSec } from './scriptLength.js';
 import { writeSubtitles } from './subtitleGenerator.js';
 import { buildTimeline, buildWalkthroughTimeline } from './timelineBuilder.js';
 import { runMoviePyPipeline } from './moviepyBridge.js';
@@ -156,21 +156,15 @@ export class RenderPipeline {
       });
       project.keywords = keywords;
 
-      report('media', 20, 'Searching and downloading stock video...');
-      const brollFromScript = (script.sections || [])
-        .flatMap((s) => s.brollSuggestions || [])
-        .map((t) => String(t).trim())
-        .filter(Boolean);
-      const searchTerms = [
-        script.topic,
-        ...brollFromScript.slice(0, 6),
-        ...keywords.keywords.slice(0, 5),
+      report('media', 20, 'Searching stock video matched to each script section...');
+      const stockVideos = await searchMediaForScript(script, {
+        keywords: keywords.keywords || [],
+        limit: 32,
+      });
+      let allMedia = [
+        ...scrapedMedia.filter((m) => m.type === 'video'),
+        ...stockVideos,
       ];
-      let allMedia = [...scrapedMedia];
-      for (const term of searchTerms.slice(0, 4)) {
-        const found = await searchMedia(term, { limit: 8 });
-        allMedia = allMedia.concat(found);
-      }
       const seenMedia = new Set();
       allMedia = allMedia.filter((m) => {
         const key = m.localPath || m.url;
@@ -189,6 +183,29 @@ export class RenderPipeline {
         ...stockManifest,
       ];
       let media = await sanitizeMediaManifest(manifest);
+
+      // Recovery path: if a previous run already downloaded stock clips into media/manifest.json,
+      // reuse them before falling back to placeholders.
+      if (!media.length) {
+        const cachedManifestPath = path.join(mediaDir, 'manifest.json');
+        if (fs.existsSync(cachedManifestPath)) {
+          try {
+            const cached = JSON.parse(fs.readFileSync(cachedManifestPath, 'utf8'));
+            if (Array.isArray(cached) && cached.length) {
+              const recovered = await sanitizeMediaManifest(cached);
+              if (recovered.length) {
+                media = recovered;
+                console.warn(
+                  `[Pipeline] Recovered ${recovered.length} media file(s) from cached manifest`,
+                );
+              }
+            }
+          } catch {
+            /* ignore malformed cached manifest */
+          }
+        }
+      }
+
       media = await ensureMediaManifest(media, mediaDir, 12);
       project.media = media;
       if (project.media.length < manifest.length) {
@@ -200,14 +217,14 @@ export class RenderPipeline {
       let tracks = [];
       let combinedPath = null;
       let audioDurationSec = null;
-      let effectiveNarrationSec = TARGET_VIDEO_DURATION_SEC;
+      let effectiveNarrationSec = estimateScriptDurationSec(script.sections);
 
-      // 4. Narration (~3:00 target) — skipped in video-only edit mode
+      // 4. Narration — length follows script; skipped in video-only edit mode
       if (videoOnly) {
         report('narration', 35, 'Skipped — video-only edit (no narration)');
         project.narration = null;
       } else {
-        report('narration', 35, 'Generating voice narration (3 min target)...');
+        report('narration', 35, 'Generating voice narration from script...');
         const narrationResult = await generateNarrationForTargetDuration(
           script.sections,
           path.join(dir, 'audio'),
@@ -219,9 +236,9 @@ export class RenderPipeline {
         );
         ({ tracks, combinedPath, durationSec: audioDurationSec } = narrationResult);
         effectiveNarrationSec =
-          audioDurationSec && audioDurationSec > 30
+          audioDurationSec && audioDurationSec > 5
             ? audioDurationSec
-            : TARGET_VIDEO_DURATION_SEC;
+            : estimateScriptDurationSec(script.sections);
         project.narration = { tracks, combinedPath, audioDurationSec: effectiveNarrationSec };
 
         script.sections = syncSectionDurationsFromAudio(script.sections, effectiveNarrationSec);

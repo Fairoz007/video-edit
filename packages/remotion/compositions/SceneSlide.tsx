@@ -53,9 +53,13 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
   const mediaStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
     transform: `scale(${emphasisZoom}) translateX(${panX}px)`,
     filter: filter !== 'none' ? filter : undefined,
+  };
+
+  const imageStyle: React.CSSProperties = {
+    ...mediaStyle,
+    objectFit: 'cover',
   };
 
   const showLowerThird = Boolean(scene.lowerThird?.name || scene.sectionTitle);
@@ -74,9 +78,9 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
         />
       )}
       {scene.type === 'video' ? (
-        <Video src={src} style={mediaStyle} muted />
+        <Video src={src} objectFit="cover" style={mediaStyle} muted />
       ) : (
-        <Img src={src} style={mediaStyle} />
+        <Img src={src} style={imageStyle} />
       )}
       <div
         style={{

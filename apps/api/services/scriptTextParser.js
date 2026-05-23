@@ -4,12 +4,11 @@
  * Format: see templates/documentary-script-demo.txt
  */
 import {
-  TARGET_VIDEO_DURATION_SEC,
   SCRIPT_SECTION_IDS,
   SCRIPT_SECTION_DURATION_HINTS,
 } from '../constants/videoDefaults.js';
 import { fixDurationSum } from './scriptLlmCommon.js';
-import { countWords } from './scriptLength.js';
+import { countWords, estimateScriptDurationSec, narrationDurationSec } from './scriptLength.js';
 
 const SECTION_ALIASES = {
   opening: ['opening', 'open', 'cold_open', 'coldopen', 'hook'],
@@ -158,8 +157,9 @@ export function parseUploadedScriptText(text, options = {}) {
     const parsed = parseSectionBody(body);
     const durationEstimate =
       parsed.durationEstimate ??
-      SCRIPT_SECTION_DURATION_HINTS[id] ??
-      Math.round(TARGET_VIDEO_DURATION_SEC / SCRIPT_SECTION_IDS.length);
+      (narrationDurationSec(parsed.narration) ||
+        SCRIPT_SECTION_DURATION_HINTS[id] ||
+        20);
 
     return {
       id,
@@ -191,7 +191,7 @@ export function parseUploadedScriptText(text, options = {}) {
     metadata: {
       generatedAt: new Date().toISOString(),
       engine: 'user-upload',
-      targetDurationSec: TARGET_VIDEO_DURATION_SEC,
+      estimatedDurationSec: estimateScriptDurationSec(normalized),
       scriptStyle: 'cinematic_documentary',
       wordCount: countWords(fullNarration),
     },

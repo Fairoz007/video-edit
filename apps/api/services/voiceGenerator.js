@@ -7,7 +7,6 @@ import fs from 'fs';
 import path from 'path';
 import { findFfmpegPath, hasFfmpeg } from '../utils/ffmpegPath.js';
 import { getMediaDurationSec } from '../utils/audioDuration.js';
-import { TARGET_VIDEO_DURATION_SEC } from '../constants/videoDefaults.js';
 import {
   listSystemVoices,
   pickVoice,
@@ -27,6 +26,16 @@ function shouldFallbackToChatterbox(err, providerMode) {
   if (status !== 402 && status !== 429 && status !== 401) return false;
   if (providerMode === 'auto') return true;
   return process.env.ELEVENLABS_FALLBACK_CHATTERBOX === '1';
+}
+
+function isChatterboxMemoryError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return (
+    msg.includes('paging file is too small') ||
+    msg.includes('os error 1455') ||
+    msg.includes('out of memory') ||
+    msg.includes('cuda out of memory')
+  );
 }
 
 function resolveVoiceOptions(options = {}) {
@@ -184,33 +193,97 @@ async function synthesizeToMp3(text, outputPath, options = {}) {
   }
 
   const wavPath = mp3Path.replace(/\.mp3$/i, '.wav');
-  const synthResult = await synthesizeChatterbox({
-    text,
-    outputWav: wavPath,
-    voice,
-    forceOneshot: options.forceOneshot,
-  });
-  const synthWav = synthResult?.path ? path.resolve(synthResult.path) : wavPath;
-  if (!fs.existsSync(synthWav)) {
-    throw new Error(`Chatterbox did not produce audio at ${synthWav}`);
-  }
+  try {
+    const synthResult = await synthesizeChatterbox({
+      text,
+      outputWav: wavPath,
+      voice,
+      forceOneshot: options.forceOneshot,
+    });
+    const synthWav = synthResult?.path ? path.resolve(synthResult.path) : wavPath;
+    if (!fs.existsSync(synthWav)) {
+      throw new Error(`Chatterbox did not produce audio at ${synthWav}`);
+    }
 
-  const processedWav = synthWav.replace(/\.wav$/i, '-proc.wav');
-  await postProcessSpeech(synthWav, processedWav, { rate, pitch });
+    const processedWav = synthWav.replace(/\.wav$/i, '-proc.wav');
+    await postProcessSpeech(synthWav, processedWav, { rate, pitch });
 
-  const finalMp3 = await convertAudio(processedWav, mp3Path);
+    const finalMp3 = await convertAudio(processedWav, mp3Path);
 
-  for (const p of [synthWav, processedWav, wavPath]) {
-    if (fs.existsSync(p) && p !== finalMp3) {
-      try {
-        fs.unlinkSync(p);
-      } catch {
-        /* ignore */
+    for (const p of [synthWav, processedWav, wavPath]) {
+      if (fs.existsSync(p) && p !== finalMp3) {
+        try {
+          fs.unlinkSync(p);
+        } catch {
+          /* ignore */
+        }
       }
     }
-  }
 
-  return { path: finalMp3, voice, rate, pitch, provider: 'chatterbox' };
+    return { path: finalMp3, voice, rate, pitch, provider: 'chatterbox' };
+  } catch (err) {
+    if (isChatterboxMemoryError(err)) {
+      try {
+        console.warn('[TTS] Chatterbox memory error on GPU, retrying on CPU one-shot...');
+        const prevDevice = process.env.CHATTERBOX_DEVICE;
+        process.env.CHATTERBOX_DEVICE = 'cpu';
+        const cpuResult = await synthesizeChatterbox({
+          text,
+          outputWav: wavPath,
+          voice,
+          forceOneshot: true,
+        });
+        const cpuWav = cpuResult?.path ? path.resolve(cpuResult.path) : wavPath;
+        const processedWav = cpuWav.replace(/\.wav$/i, '-proc.wav');
+        await postProcessSpeech(cpuWav, processedWav, { rate, pitch });
+        const finalMp3 = await convertAudio(processedWav, mp3Path);
+        process.env.CHATTERBOX_DEVICE = prevDevice;
+        return { path: finalMp3, voice, rate, pitch, provider: 'chatterbox' };
+      } catch {
+        // continue to ElevenLabs fallback below
+      }
+    }
+
+    // Windows CUDA can fail with OSError 1455; auto-fallback to ElevenLabs if available.
+    if (isChatterboxMemoryError(err) && isElevenLabsEnabled()) {
+      console.warn('[TTS] Chatterbox memory error, falling back to ElevenLabs:', err.message);
+      const elVoice =
+        voices.find((v) => v.engine === 'elevenlabs')?.id || process.env.ELEVENLABS_VOICE_ID;
+      if (elVoice) {
+        const rawMp3 = mp3Path.replace(/\.mp3$/i, '-el-fallback.mp3');
+        const result = await synthesizeElevenLabs({
+          text,
+          outputPath: rawMp3,
+          voiceId: elVoice,
+          rate,
+        });
+        if (path.resolve(result.path) !== path.resolve(mp3Path)) {
+          fs.copyFileSync(result.path, mp3Path);
+          try {
+            fs.unlinkSync(result.path);
+          } catch {
+            /* ignore */
+          }
+        }
+        return {
+          path: mp3Path,
+          voice: result.voiceId || elVoice,
+          rate,
+          pitch,
+          provider: 'elevenlabs',
+          model: result.model,
+        };
+      }
+    }
+
+    if (isChatterboxMemoryError(err)) {
+      throw new Error(
+        `Chatterbox failed due to GPU/virtual memory pressure (${err.message}). ` +
+          'Set CHATTERBOX_DEVICE=cpu in .env or increase Windows paging file size.',
+      );
+    }
+    throw err;
+  }
 }
 
 export async function generateVoicePreview(outputPath, options = {}) {
@@ -258,43 +331,35 @@ export async function generateNarration(sections, outputDir, options = {}) {
 }
 
 /**
- * Generate narration and slow TTS rate until audio is close to target duration (~3:00).
+ * Generate narration at natural TTS pace; video length follows the script/audio.
+ * Optional targetDurationSec (env VIDEO_TARGET_DURATION_SEC) only enables legacy stretch retries.
  */
 export async function generateNarrationForTargetDuration(sections, outputDir, options = {}) {
-  const targetSec = options.targetDurationSec ?? TARGET_VIDEO_DURATION_SEC;
+  const targetSec = options.targetDurationSec ?? null;
   let rate = resolveVoiceOptions(options).rate;
   let result = await generateNarration(sections, outputDir, { ...options, rate });
   let durationSec = await getMediaDurationSec(result.combinedPath);
 
-  const meta = getVoiceMeta(
-    (await listSystemVoices()).voices,
-    result.voice,
-  );
-  const isEl = meta?.engine === 'elevenlabs';
+  if (targetSec && targetSec > 0 && durationSec && durationSec < targetSec * 0.88) {
+    const meta = getVoiceMeta((await listSystemVoices()).voices, result.voice);
+    const isEl = meta?.engine === 'elevenlabs';
+    const minAcceptable = targetSec * 0.88;
+    const maxAttempts = isEl ? 2 : 6;
 
-  const minAcceptable = targetSec * 0.88;
-  const maxAttempts = isEl ? 2 : 6;
-
-  for (let attempt = 0; attempt < maxAttempts && durationSec && durationSec < minAcceptable; attempt++) {
-    const ratio = durationSec / targetSec;
-    rate = Math.max(80, Math.min(220, Math.floor(rate * ratio * 0.88)));
-    console.log(
-      `[TTS] Audio ${durationSec.toFixed(1)}s < ${targetSec}s target — retry ${attempt + 1} at rate ${rate}`,
-    );
-    result = await generateNarration(sections, outputDir, { ...options, rate });
-    durationSec = await getMediaDurationSec(result.combinedPath);
-  }
-
-  if (durationSec && durationSec < minAcceptable) {
-    console.warn(
-      `[TTS] Narration is ${durationSec.toFixed(1)}s (target ${targetSec}s). Script may be too short or TTS is reading too fast.`,
-    );
+    for (let attempt = 0; attempt < maxAttempts && durationSec < minAcceptable; attempt++) {
+      const ratio = durationSec / targetSec;
+      rate = Math.max(80, Math.min(220, Math.floor(rate * ratio * 0.88)));
+      console.log(
+        `[TTS] Audio ${durationSec.toFixed(1)}s < ${targetSec}s override — retry ${attempt + 1} at rate ${rate}`,
+      );
+      result = await generateNarration(sections, outputDir, { ...options, rate });
+      durationSec = await getMediaDurationSec(result.combinedPath);
+    }
   }
 
   return {
     ...result,
     durationSec: durationSec || null,
-    targetDurationSec: targetSec,
     rate,
   };
 }

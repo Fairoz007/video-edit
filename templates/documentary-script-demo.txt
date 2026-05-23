@@ -2,7 +2,7 @@
 # 1. Change TOPIC below to your subject.
 # 2. Edit narration and visuals in each [section] block.
 # 3. Save as .txt and upload in the app (Upload script tab).
-# Duration hints are optional; the app scales sections to your target video length (~3 min default).
+# Duration hints are optional; video length follows your narration (spoken at ~150 WPM by default).
 
 TOPIC: YOUR TOPIC HERE — e.g. The 2026 FIFA World Cup
 
