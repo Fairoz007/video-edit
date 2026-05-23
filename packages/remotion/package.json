@@ -9,6 +9,7 @@
     "render:walkthrough": "remotion render index.ts Walkthrough ../../out/walkthrough-preview.mp4"
   },
   "dependencies": {
+    "@remotion/captions": "4.0.462",
     "@remotion/google-fonts": "^4.0.462",
     "@remotion/media": "^4.0.462",
     "@remotion/transitions": "^4.0.462",
