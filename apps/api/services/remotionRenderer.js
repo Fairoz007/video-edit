@@ -2,7 +2,8 @@
  * Remotion bundle + render — documentary & walkthrough compositions.
  */
 import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition } from '@remotion/renderer';
+import { makeCancelSignal, renderMedia, selectComposition } from '@remotion/renderer';
+import { isUserCancelledRender, RenderCancelledError } from './renderErrors.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -262,24 +263,42 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     inputProps: renderProps,
   });
 
+  const { cancelSignal, cancel } = makeCancelSignal();
+  if (options.renderJob) {
+    options.renderJob.cancelRemotion = cancel;
+    if (options.renderJob.cancelled) cancel();
+  }
+
   let lastRemotionPct = -1;
-  await renderMedia({
-    composition,
-    serveUrl: bundleLocation,
-    codec: 'h264',
-    pixelFormat: 'yuv420p',
-    audioCodec: 'aac',
-    outputLocation: outputPath,
-    inputProps: renderProps,
-    chromiumOptions: { disableWebSecurity: true },
-    onProgress: ({ progress }) => {
-      const pct = Math.floor(progress * 100);
-      if (pct >= lastRemotionPct + 10 || pct === 100) {
-        lastRemotionPct = pct;
-        console.log(`[Remotion:${compositionId}] ${pct}%`);
-      }
-    },
-  });
+  try {
+    await renderMedia({
+      composition,
+      serveUrl: bundleLocation,
+      codec: 'h264',
+      pixelFormat: 'yuv420p',
+      audioCodec: 'aac',
+      outputLocation: outputPath,
+      inputProps: renderProps,
+      cancelSignal,
+      chromiumOptions: { disableWebSecurity: true },
+      onProgress: ({ progress }) => {
+        const pct = Math.floor(progress * 100);
+        if (pct >= lastRemotionPct + 10 || pct === 100) {
+          lastRemotionPct = pct;
+          console.log(`[Remotion:${compositionId}] ${pct}%`);
+        }
+      },
+    });
+  } catch (err) {
+    if (isUserCancelledRender(err) || options.renderJob?.cancelled) {
+      throw new RenderCancelledError();
+    }
+    throw err;
+  }
+
+  if (options.renderJob?.cancelled) {
+    throw new RenderCancelledError();
+  }
 
   const ok = await verifyVideoFile(outputPath);
   if (!ok) {

@@ -60,6 +60,7 @@ export interface WalkthroughScreen {
 }
 
 export interface WalkthroughProps {
+  [key: string]: unknown;
   projectName: string;
   screens: WalkthroughScreen[];
   narrationAudioSrc?: string;

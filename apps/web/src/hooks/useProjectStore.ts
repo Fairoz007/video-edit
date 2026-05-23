@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DocumentaryInput, ExportOptions, ScriptSection, TimelineScene } from '../utils/api';
+import type { DocumentaryInput, ExportOptions, TimelineResult } from '../utils/api';
 
 export interface ProjectState {
   projectId: string | null;
@@ -7,7 +7,7 @@ export interface ProjectState {
   script: { topic: string; sections: ScriptSection[]; fullNarration: string } | null;
   keywords: { keywords: string[] } | null;
   media: unknown[];
-  timeline: { scenes: TimelineScene[]; totalDuration: number } | null;
+  timeline: TimelineResult | null;
   status: 'idle' | 'generating' | 'rendering' | 'completed' | 'failed';
   progress: number;
   stage: string;

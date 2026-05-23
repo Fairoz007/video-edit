@@ -8,13 +8,27 @@ import {
   generateScript,
   getProject,
   scrapeUrlFull,
+  cancelRender,
+  restartRender,
   startRender,
 } from '../utils/api';
 import { normalizeMediaList } from '../utils/mediaUrl';
 import { isValidHttpUrl, normalizeHttpUrlInput } from '../utils/urls';
 import { useProjectStore } from './useProjectStore';
+import type { DocumentaryInput, TimelineResult } from '../utils/api';
 
 export type InputTab = 'topic' | 'article' | 'youtube' | 'script';
+
+function applyTimelineToStore(
+  store: ReturnType<typeof useProjectStore.getState>,
+  script: NonNullable<ReturnType<typeof useProjectStore.getState>['script']>,
+  timeline: TimelineResult,
+) {
+  store.setTimeline(timeline);
+  if (timeline.sections?.length) {
+    store.setScript({ ...script, sections: timeline.sections });
+  }
+}
 
 function formatApiError(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -127,11 +141,9 @@ export function useDocumentaryPipeline() {
             media: store.media,
             audioTracks: [],
             editMode: input.editMode || 'with-narration',
+            templateId: input.templateId,
           });
-          store.setTimeline(timeline);
-          if (timeline.sections?.length) {
-            store.setScript({ ...script, sections: timeline.sections });
-          }
+          applyTimelineToStore(store, script, timeline);
         }
         store.setStatus('idle');
       } catch (e) {
@@ -169,17 +181,15 @@ export function useDocumentaryPipeline() {
 
         const script = useProjectStore.getState().script;
         if (script) {
-          const { editMode } = useProjectStore.getState().input;
+          const { editMode, templateId } = useProjectStore.getState().input;
           const { data: timeline } = await buildTimeline({
             script,
             media,
             audioTracks: [],
             editMode: editMode || 'with-narration',
+            templateId,
           });
-          store.setTimeline(timeline);
-          if (timeline.sections?.length) {
-            store.setScript({ ...script, sections: timeline.sections });
-          }
+          applyTimelineToStore(store, script, timeline);
         }
 
         return `Scraped ${media.length} asset(s) from "${title}"`;
@@ -190,6 +200,73 @@ export function useDocumentaryPipeline() {
     },
     [validateInput, normalizedInput, store],
   );
+
+  const cancelRenderFlow = useCallback(async () => {
+    const { projectId } = useProjectStore.getState();
+    if (!projectId) {
+      store.setStatus('idle');
+      store.setProgress(0, '', '');
+      return;
+    }
+    try {
+      await cancelRender(projectId);
+      store.setStatus('idle');
+      store.setProgress(0, 'cancelled', 'Render stopped');
+      store.setError(null);
+    } catch (e) {
+      store.setError(formatApiError(e));
+    }
+  }, [store]);
+
+  const restartRenderFlow = useCallback(async () => {
+    const state = useProjectStore.getState();
+    if (!state.script) {
+      const tab: InputTab = state.input.scriptText?.trim()
+        ? 'script'
+        : state.input.youtubeUrl
+          ? 'youtube'
+          : state.input.articleUrl
+            ? 'article'
+            : 'topic';
+      const err = validateInput(tab);
+      if (err) {
+        store.setError(err);
+        return;
+      }
+    }
+
+    store.setError(null);
+    store.setStatus('rendering');
+    store.setProgress(0, 'queued', 'Restarting render…');
+
+    try {
+      const input = normalizedInput();
+      const { voiceSettings, exportOptions, projectId } = state;
+      const editMode = input.editMode || 'with-narration';
+      const { data } = await restartRender({
+        projectId: projectId || undefined,
+        input: {
+          ...input,
+          editMode,
+          voice: voiceSettings.voice,
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+        },
+        options: {
+          ...exportOptions,
+          editMode,
+          videoOnly: editMode === 'video-only',
+          voice: voiceSettings.voice,
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+        },
+      });
+      store.setProjectId(data.projectId);
+    } catch (e) {
+      store.setStatus('failed');
+      store.setError(formatApiError(e));
+    }
+  }, [validateInput, normalizedInput, store]);
 
   const startRenderFlow = useCallback(async () => {
     const state = useProjectStore.getState();
@@ -241,6 +318,32 @@ export function useDocumentaryPipeline() {
     }
   }, [validateInput, normalizedInput, store]);
 
+  const rebuildTimelineFlow = useCallback(
+    async (inputOverrides?: Partial<DocumentaryInput>) => {
+      const state = useProjectStore.getState();
+      const input = { ...state.input, ...inputOverrides };
+      if (!state.script || state.media.length === 0) return false;
+      if (input.videoStyle === 'walkthrough') return false;
+
+      store.setError(null);
+      try {
+        const { data: timeline } = await buildTimeline({
+          script: state.script,
+          media: state.media,
+          audioTracks: [],
+          editMode: input.editMode || 'with-narration',
+          templateId: input.templateId,
+        });
+        applyTimelineToStore(store, state.script, timeline);
+        return true;
+      } catch (e) {
+        store.setError(formatApiError(e));
+        return false;
+      }
+    },
+    [store],
+  );
+
   const saveProject = useCallback(async () => {
     store.setError(null);
     try {
@@ -261,6 +364,9 @@ export function useDocumentaryPipeline() {
     generateScriptFlow,
     scrapeMediaFlow,
     startRenderFlow,
+    cancelRenderFlow,
+    restartRenderFlow,
+    rebuildTimelineFlow,
     loadProject,
     saveProject,
     hydrateProject,

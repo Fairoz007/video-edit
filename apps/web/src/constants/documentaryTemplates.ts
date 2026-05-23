@@ -1,6 +1,19 @@
 /** Visual documentary templates (mirrors @docuforge/config/documentaryTemplates). */
 export const DEFAULT_TEMPLATE_ID = 'template_cinematic_docuforge';
 
+/** Intro length in seconds at 30fps — mirrors documentaryTemplates intro.duration_frames */
+export const TEMPLATE_INTRO_SEC: Record<string, number> = {
+  [DEFAULT_TEMPLATE_ID]: 3,
+  template_cinematic_noir: 4,
+  template_hype_sports: 2,
+  template_premium_longform: 5,
+};
+
+export function getTemplateIntroSec(templateId?: string): number {
+  const id = templateId || DEFAULT_TEMPLATE_ID;
+  return TEMPLATE_INTRO_SEC[id] ?? TEMPLATE_INTRO_SEC[DEFAULT_TEMPLATE_ID];
+}
+
 export interface DocumentaryTemplateOption {
   id: string;
   name: string;

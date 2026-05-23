@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
 import { Audio } from '@remotion/media';
+import { CameraMotionBlur } from '@remotion/motion-blur';
 import { resolveMediaSrc } from '../lib/assets';
 import { TransitionSeries } from '@remotion/transitions';
 import { sumSceneDurationsWithTransitions } from '../lib/duration';
@@ -26,10 +27,12 @@ import { SceneSlide } from './SceneSlide';
 import { GlobalProgressBar } from './GlobalProgressBar';
 import { CornerBrackets } from './CornerBrackets';
 import { ChapterBadgeLayer } from './ChapterBadge';
+import { EffectsLayer } from './EffectsLayer';
 
 export type { Scene };
 
 export interface DocumentaryProps {
+  [key: string]: unknown;
   title: string;
   sections: { id: string; title: string; narration: string }[];
   scenes: Scene[];
@@ -56,7 +59,7 @@ const DocumentaryScenes: React.FC<{
 
   const prepared = scenes.map((scene, i) => ({
     ...scene,
-    duration: Math.max(2.5, scene.duration * scale),
+    duration: Math.max(2.5, (Number(scene.duration) || 2.5) * scale),
     transition: (scene.transition ||
       mapTemplateTransitionType(
         i % 2 === 0
@@ -113,13 +116,20 @@ const DocumentaryInner: React.FC<DocumentaryProps> = ({
 }) => {
   const theme = useVisualTemplate();
   const { fps, durationInFrames } = useVideoConfig();
-  const introFrames = Math.round(
-    (introGraphicSec ?? theme.intro.durationFrames / fps) * fps,
+  const introSec =
+    introGraphicSec ??
+    (Number(theme.intro.durationFrames) > 0 ? theme.intro.durationFrames / fps : 3);
+  const introFrames = Math.max(fps, Math.round(introSec * fps) || fps);
+  const outroFrames = Math.max(fps, Math.round(outroGraphicSec * fps) || fps);
+  const contentFrames = Math.max(
+    fps,
+    Number.isFinite(durationInFrames)
+      ? durationInFrames - introFrames - outroFrames
+      : fps,
   );
-  const outroFrames = Math.round(outroGraphicSec * fps);
-  const contentFrames = Math.max(fps, durationInFrames - introFrames - outroFrames);
 
-  const sceneDurationTotal = scenes.reduce((a, s) => a + s.duration, 0) || 1;
+  const sceneDurationTotal =
+    scenes.reduce((a, s) => a + (Number(s.duration) || 0), 0) || 1;
   const scale = contentFrames / fps / sceneDurationTotal;
   const useKinetic = wordCues.length > 0;
 
@@ -130,7 +140,13 @@ const DocumentaryInner: React.FC<DocumentaryProps> = ({
       </Sequence>
 
       <Sequence from={introFrames} durationInFrames={contentFrames}>
-        <DocumentaryScenes scenes={scenes} scale={scale} />
+        {theme.effects?.motionBlur ? (
+          <CameraMotionBlur shutterAngle={90} samples={5}>
+            <DocumentaryScenes scenes={scenes} scale={scale} />
+          </CameraMotionBlur>
+        ) : (
+          <DocumentaryScenes scenes={scenes} scale={scale} />
+        )}
       </Sequence>
 
       <Sequence from={durationInFrames - outroFrames} durationInFrames={outroFrames}>
@@ -143,6 +159,7 @@ const DocumentaryInner: React.FC<DocumentaryProps> = ({
           pointerEvents: 'none',
         }}
       />
+      <EffectsLayer />
       <GlobalProgressBar />
       <CornerBrackets />
       <MotionAccent />

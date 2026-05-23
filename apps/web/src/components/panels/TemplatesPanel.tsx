@@ -1,5 +1,6 @@
 import { Film, LayoutTemplate, MonitorPlay } from 'lucide-react';
 import { useProjectStore } from '../../hooks/useProjectStore';
+import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
 import {
   DEFAULT_TEMPLATE_ID,
   DOCUMENTARY_VISUAL_TEMPLATES,
@@ -27,15 +28,19 @@ function TemplateSwatch({
 }
 
 export function TemplatesPanel() {
-  const { input, setInput } = useProjectStore();
+  const { input, setInput, script, media } = useProjectStore();
+  const { rebuildTimelineFlow } = useDocumentaryPipeline();
   const activeId = input.templateId || DEFAULT_TEMPLATE_ID;
   const isWalkthrough = input.videoStyle === 'walkthrough';
 
-  const applyVisualTemplate = (id: string) => {
+  const applyVisualTemplate = async (id: string) => {
     setInput({
       videoStyle: 'documentary',
       templateId: id,
     });
+    if (script && media.length > 0) {
+      await rebuildTimelineFlow({ videoStyle: 'documentary', templateId: id });
+    }
   };
 
   const applyWalkthrough = (id: string, videoStyle: VideoStyle) => {

@@ -5,7 +5,11 @@ import { TimelineToolbar } from './TimelineToolbar';
 import { TimelineTrack } from './TimelineTrack';
 import { TimelineEmptyState } from './TimelineEmptyState';
 import { useProjectStore } from '../../hooks/useProjectStore';
-import { buildNarrationTrackItems, isVideoOnlyEditMode } from '../../utils/timelineSync';
+import {
+  buildNarrationTrackItems,
+  isVideoOnlyEditMode,
+  resolveIntroOffsetSec,
+} from '../../utils/timelineSync';
 import { useUiStore } from '../../hooks/useUiStore';
 
 export function Timeline() {
@@ -35,9 +39,10 @@ export function Timeline() {
         }))
       : [];
 
+  const introOffsetSec = resolveIntroOffsetSec(timeline, input.templateId);
   const narrationItems = videoOnly
     ? []
-    : buildNarrationTrackItems(script?.sections ?? [], scenes, totalDuration);
+    : buildNarrationTrackItems(script?.sections ?? [], scenes, totalDuration, introOffsetSec);
 
   const hasContent = videoItems.length > 0 || narrationItems.length > 0;
 

@@ -16,8 +16,27 @@ export interface VisualTheme {
   globalLut: string;
   filmGrain: number;
   vignette: number;
-  cornerBrackets: boolean;
-  bracketColor: string;
+  chromaticAberration?: boolean;
+  glitchIntensity?: number;
+  effects?: {
+    filmGrain?: number;
+    vignette?: number;
+    chromaticAberration?: boolean;
+    glitchIntensity?: number;
+    lightLeak?: boolean;
+    lightLeakHue?: number;
+    accentShapes?: boolean;
+    motionBlur?: boolean;
+  };
+  cornerBrackets:
+    | boolean
+    | {
+        enabled: boolean;
+        color: string;
+        size: number;
+        weight: number;
+      };
+  bracketColor?: string;
   intro: {
     style: string;
     bg: string;
@@ -26,20 +45,41 @@ export interface VisualTheme {
     durationFrames: number;
   };
   subtitles: {
+    mode?: string;
+    chunkSize?: number;
     position: string;
     marginBottom: number;
     marginLeft: number;
+    marginRight?: number;
+    maxWidthPx?: number;
     fontSize: number;
     fontWeight: string;
     fontStyle: string;
+    letterSpacing?: number;
     color: string;
     highlightColor: string;
     textTransform: string;
     textShadow?: string;
-    background?: { enabled: boolean; color?: string; border_radius?: number };
+    background?: {
+      enabled: boolean;
+      color?: string;
+      borderRadius?: number;
+      border_radius?: number;
+      paddingX?: number;
+      paddingY?: number;
+    };
     stroke?: { enabled: boolean; color: string; width: number };
     enterAnimation: string;
     exitAnimation: string;
+    layout?: {
+      position: string;
+      marginBottom: number;
+      marginLeft: number;
+      marginRight: number;
+      maxWidthPx: number;
+    };
+    style?: Record<string, unknown>;
+    wordAnimation?: Record<string, unknown>;
   };
   chapterBadge: {
     style: string;
@@ -69,7 +109,14 @@ export interface VisualTheme {
     wipeAngleDeg?: number;
     flipDirection?: string;
   };
-  bgEffects: { scaleMin: number; scaleMax: number; durationMultiplier: number };
+  bgEffects: {
+    scaleMin: number;
+    scaleMax: number;
+    durationMultiplier: number;
+    directions?: string[];
+    easing?: string;
+    type?: string;
+  };
   outro: {
     style: string;
     bg: string;
@@ -95,7 +142,24 @@ export const DEFAULT_VISUAL_THEME: VisualTheme = {
   globalLut: 'cinematic_teal_orange',
   filmGrain: 0.08,
   vignette: 0.35,
-  cornerBrackets: true,
+  chromaticAberration: false,
+  glitchIntensity: 0,
+  effects: {
+    filmGrain: 0.08,
+    vignette: 0.35,
+    chromaticAberration: false,
+    glitchIntensity: 0,
+    lightLeak: true,
+    lightLeakHue: 275,
+    accentShapes: true,
+    motionBlur: false,
+  },
+  cornerBrackets: {
+    enabled: true,
+    color: '#7C3AED',
+    size: 24,
+    weight: 2,
+  },
   bracketColor: '#7C3AED',
   intro: {
     style: 'cinematic_reveal',

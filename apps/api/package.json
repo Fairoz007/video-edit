@@ -10,8 +10,8 @@
   "dependencies": {
     "@docuforge/config": "*",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@remotion/bundler": "^4.0.462",
-    "@remotion/renderer": "^4.0.462",
+    "@remotion/bundler": "4.0.465",
+    "@remotion/renderer": "4.0.465",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "compromise": "^14.14.4",

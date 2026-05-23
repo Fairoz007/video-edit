@@ -867,6 +867,28 @@ export function resolveVisualTheme(templateOrId) {
     vignette:            t.vignette_strength     ?? 0.35,
     chromaticAberration: t.chromatic_aberration  ?? false,
     glitchIntensity:     t.glitch_intensity      ?? 0,
+    effects: {
+      filmGrain:           t.film_grain_opacity    ?? 0.08,
+      vignette:            t.vignette_strength     ?? 0.35,
+      chromaticAberration: t.chromatic_aberration  ?? false,
+      glitchIntensity:     t.glitch_intensity      ?? 0,
+      lightLeak:
+        t.style === 'cinematic_dark' ||
+        t.style === 'premium_editorial_netflix' ||
+        t.style === 'hype_sports_youtube',
+      lightLeakHue:
+        t.style === 'hype_sports_youtube'
+          ? 210
+          : t.style === 'premium_editorial_netflix'
+            ? 32
+            : 275,
+      accentShapes:
+        t.style === 'hype_sports_youtube' ||
+        t.style === 'cinematic_dark',
+      motionBlur:
+        t.style === 'hype_sports_youtube' ||
+        trans.default_presentation === 'wipe',
+    },
 
     // ── Audio
     audio: {
@@ -890,6 +912,34 @@ export function resolveVisualTheme(templateOrId) {
     subtitles: {
       mode:      subs.mode       || 'word_by_word',
       chunkSize: subs.chunk_size || 1,
+      position: sl.position      || 'bottom_center',
+      marginBottom: sl.margin_bottom ?? 80,
+      marginLeft:  sl.margin_left   ?? 0,
+      marginRight: sl.margin_right  ?? 0,
+      maxWidthPx:  sl.max_width_px  || 900,
+      fontSize:       ss.font_size      ?? 52,
+      fontWeight:     ss.font_weight    || '700',
+      fontStyle:      ss.font_style     || 'normal',
+      letterSpacing:  ss.letter_spacing ?? 0,
+      textTransform:  ss.text_transform || 'none',
+      color:          ss.color          || p.text,
+      highlightColor: ss.highlight_color || p.accent,
+      textShadow:     ss.text_shadow    || null,
+      background: {
+        enabled:      ssb.enabled       ?? false,
+        color:        ssb.color         || 'rgba(0,0,0,0.55)',
+        borderRadius: ssb.border_radius ?? 8,
+        border_radius: ssb.border_radius ?? 8,
+        paddingX:     ssb.padding_x     ?? 12,
+        paddingY:     ssb.padding_y     ?? 6,
+      },
+      stroke: {
+        enabled: sss.enabled ?? false,
+        color:   sss.color   || '#000000',
+        width:   sss.width   ?? 0,
+      },
+      enterAnimation: swea.enter?.type || 'slide_up_fade',
+      exitAnimation: swea.exit?.type || 'slide_up_fade',
       layout: {
         position:    sl.position      || 'bottom_center',
         marginBottom: sl.margin_bottom ?? 80,
@@ -941,6 +991,8 @@ export function resolveVisualTheme(templateOrId) {
       fontStyle:      badge.font_style     || 'normal',
       letterSpacing:  badge.letter_spacing ?? 0,
       textTransform:  badge.text_transform || 'none',
+      /** Frame when exit fade begins — used by ChapterBadge.tsx */
+      exitDelayFrames: badge.animation?.hold_frames ?? 60,
       animation: {
         enterType:      badge.animation?.enter?.type           || 'slide_right_fade',
         enterFrames:    badge.animation?.enter?.duration_frames ?? 15,
@@ -1004,6 +1056,7 @@ export function resolveVisualTheme(templateOrId) {
       size:    cb.size   ?? 24,
       weight:  cb.weight ?? 2,
     },
+    bracketColor: cb.color || p.primary,
 
     // ── Ken Burns / bg motion
     bgEffects: {

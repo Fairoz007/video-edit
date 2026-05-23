@@ -4,16 +4,18 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { RenderCancelledError } from './renderErrors.js';
 import { resolvePython } from '../utils/resolvePython.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, '../moviepy/moviepy_renderer.py');
 
-export function runMoviePyPipeline(configPath, onProgress) {
+export function runMoviePyPipeline(configPath, onProgress, renderJob) {
   return new Promise((resolve, reject) => {
     const proc = spawn(resolvePython(), [SCRIPT, '--config', configPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    if (renderJob) renderJob.moviePyProc = proc;
 
     let stdout = '';
     proc.stdout.on('data', (d) => {
@@ -37,6 +39,10 @@ export function runMoviePyPipeline(configPath, onProgress) {
     });
 
     proc.on('close', (code, signal) => {
+      if (renderJob?.cancelled) {
+        reject(new RenderCancelledError());
+        return;
+      }
       if (code === 0) {
         try {
           const result = JSON.parse(stdout.trim().split('\n').pop());

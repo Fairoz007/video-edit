@@ -21,10 +21,10 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const src = resolveMediaSrc(scene.src);
-  const durationFrames = Math.max(1, Math.round(scene.duration * fps));
+  const durationFrames = Math.max(1, Math.round((Number(scene.duration) || 2.5) * fps));
 
-  const scaleFrom = scene.kenBurnsFrom ?? theme.bgEffects.scaleMax;
-  const scaleTo = scene.kenBurnsTo ?? theme.bgEffects.scaleMin;
+  const scaleFrom = Number(scene.kenBurnsFrom ?? theme.bgEffects?.scaleMin ?? 1) || 1;
+  const scaleTo = Number(scene.kenBurnsTo ?? theme.bgEffects?.scaleMax ?? 1.08) || 1.08;
 
   const kenBurns = spring({
     frame,
@@ -49,12 +49,21 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
       : kenBurns;
 
   const filter = colorGradeFilter(scene.colorGrade || theme.globalLut);
+  const glitchIntensity = theme.effects?.glitchIntensity ?? theme.glitchIntensity ?? 0;
+  const chromatic = theme.effects?.chromaticAberration ?? theme.chromaticAberration;
+  const glitchShift =
+    glitchIntensity > 0 && frame % 38 < 3
+      ? Math.sin(frame * 11) * 10 * glitchIntensity
+      : 0;
 
   const mediaStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
-    transform: `scale(${emphasisZoom}) translateX(${panX}px)`,
+    transform: `scale(${emphasisZoom}) translateX(${panX + glitchShift}px)`,
     filter: filter !== 'none' ? filter : undefined,
+    boxShadow: chromatic
+      ? '6px 0 0 rgba(255,0,80,0.16), -6px 0 0 rgba(0,245,255,0.14)'
+      : undefined,
   };
 
   const imageStyle: React.CSSProperties = {

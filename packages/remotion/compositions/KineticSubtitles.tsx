@@ -16,6 +16,9 @@ export interface KineticSubtitlesProps {
 export const KineticSubtitles: React.FC<KineticSubtitlesProps> = ({ wordCues }) => {
   const theme = useVisualTemplate();
   const subs = theme.subtitles;
+  const position = subs.position || subs.layout?.position || 'bottom_center';
+  const marginBottom = subs.marginBottom ?? subs.layout?.marginBottom ?? 80;
+  const marginLeft = subs.marginLeft ?? subs.layout?.marginLeft ?? 0;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const timeSec = frame / fps;
@@ -24,10 +27,11 @@ export const KineticSubtitles: React.FC<KineticSubtitlesProps> = ({ wordCues }) 
   if (!active) return null;
 
   const localFrame = Math.round((timeSec - active.startSec) * fps);
-  const durationFrames = Math.max(1, Math.round((active.endSec - active.startSec) * fps));
+  const cueDurationSec = Math.max(0.05, (active.endSec - active.startSec) || 0.2);
+  const durationFrames = Math.max(1, Math.round(cueDurationSec * fps));
 
-  const isCenter = subs.position === 'center' || subs.position === 'center_dynamic';
-  const isLeft = subs.position === 'bottom_left' || subs.position === 'bottom_left_offset';
+  const isCenter = position === 'center' || position === 'center_dynamic';
+  const isLeft = position === 'bottom_left' || position === 'bottom_left_offset';
 
   let y = 0;
   let x = 0;
@@ -79,13 +83,13 @@ export const KineticSubtitles: React.FC<KineticSubtitlesProps> = ({ wordCues }) 
       }
     : isLeft
       ? {
-          bottom: subs.marginBottom,
-          left: subs.marginLeft,
+          bottom: marginBottom,
+          left: marginLeft,
           right: 'auto',
           justifyContent: 'flex-start',
         }
       : {
-          bottom: subs.marginBottom,
+          bottom: marginBottom,
           left: 0,
           right: 0,
           justifyContent: 'center',
@@ -108,7 +112,7 @@ export const KineticSubtitles: React.FC<KineticSubtitlesProps> = ({ wordCues }) 
       <div
         style={{
           padding: bg?.enabled ? '8px 20px' : 0,
-          borderRadius: bg?.border_radius ?? 8,
+          borderRadius: bg?.borderRadius ?? bg?.border_radius ?? 8,
           background: bg?.enabled ? bg.color : 'transparent',
           boxShadow: subs.textShadow,
         }}
@@ -121,7 +125,7 @@ export const KineticSubtitles: React.FC<KineticSubtitlesProps> = ({ wordCues }) 
             fontStyle: subs.fontStyle as React.CSSProperties['fontStyle'],
             fontFamily: interFamily,
             textTransform: subs.textTransform as React.CSSProperties['textTransform'],
-            letterSpacing: 1,
+            letterSpacing: subs.letterSpacing ?? 1,
             WebkitTextStroke: stroke?.enabled ? `${stroke.width}px ${stroke.color}` : undefined,
           }}
         >

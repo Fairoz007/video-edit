@@ -34,11 +34,63 @@ import {
   resolveBackgroundMusicPath,
   defaultMusicVolume,
 } from '../utils/backgroundMusic.js';
+import { RenderCancelledError } from './renderErrors.js';
 
 export class RenderPipeline {
   constructor(root) {
     this.root = root;
+    /** @type {Map<string, { cancelled: boolean, cancelRemotion: (() => void) | null, moviePyProc: import('child_process').ChildProcess | null, cancel: () => void }>} */
     this.jobs = new Map();
+  }
+
+  _beginJob(projectId) {
+    const existing = this.jobs.get(projectId);
+    existing?.cancel();
+
+    const job = {
+      cancelled: false,
+      cancelRemotion: null,
+      moviePyProc: null,
+      cancel() {
+        job.cancelled = true;
+        job.cancelRemotion?.();
+        if (job.moviePyProc?.pid && !job.moviePyProc.killed) {
+          try {
+            job.moviePyProc.kill('SIGTERM');
+          } catch {
+            /* process may have exited */
+          }
+        }
+      },
+    };
+    this.jobs.set(projectId, job);
+    return job;
+  }
+
+  _assertNotCancelled(projectId) {
+    if (this.jobs.get(projectId)?.cancelled) {
+      throw new RenderCancelledError();
+    }
+  }
+
+  _markProjectCancelled(projectId) {
+    const projectPath = path.join(projectDir(this.root, projectId), 'project.json');
+    if (!fs.existsSync(projectPath)) return false;
+    const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+    if (project.status === 'completed') return false;
+    project.status = 'cancelled';
+    project.stage = 'cancelled';
+    project.message = 'Render stopped';
+    project.cancelledAt = new Date().toISOString();
+    delete project.error;
+    fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    return true;
+  }
+
+  cancelRender(projectId) {
+    const job = this.jobs.get(projectId);
+    if (job) job.cancel();
+    return this._markProjectCancelled(projectId) || Boolean(job);
   }
 
   async createProject(input) {
@@ -82,6 +134,7 @@ export class RenderPipeline {
   async runFullPipeline(projectId, options = {}, onProgress) {
     const dir = projectDir(this.root, projectId);
     const projectPath = path.join(dir, 'project.json');
+    const renderJob = this._beginJob(projectId);
     let project = this.loadOrCreateProject(projectId, options.input);
 
     if (options.input && typeof options.input === 'object') {
@@ -100,15 +153,21 @@ export class RenderPipeline {
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
     }
 
+    project.status = 'rendering';
+    project.error = undefined;
+
     const report = (stage, progress, message) => {
+      this._assertNotCancelled(projectId);
       onProgress?.({ projectId, stage, progress, message });
       project.stage = stage;
       project.progress = progress;
       project.message = message;
+      project.status = 'rendering';
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
     };
 
     try {
+      this._assertNotCancelled(projectId);
       // 1. Script
       const uploadedScript = Boolean(project.input?.scriptText?.trim());
       report(
@@ -339,9 +398,14 @@ export class RenderPipeline {
         await renderRemotionPreview(remotionProps, videoPath, {
           publicDir: path.join(dir, 'remotion-public'),
           compositionId,
+          renderJob,
         });
       } catch (err) {
+        if (err instanceof RenderCancelledError || renderJob.cancelled) {
+          throw err;
+        }
         console.warn('[Pipeline] Remotion failed, falling back to MoviePy:', err.message);
+        this._assertNotCancelled(projectId);
         report('moviepy', 58, 'MoviePy clip sequencing...');
         const moviepyScenes = await prepareMoviePyScenes(timeline.scenes);
         if (!moviepyScenes.length) {
@@ -356,8 +420,10 @@ export class RenderPipeline {
         };
         fs.writeFileSync(path.join(dir, 'moviepy-config.json'), JSON.stringify(moviepyConfig, null, 2));
         videoPath = path.join(dir, 'renders', 'moviepy-output.mp4');
-        await runMoviePyPipeline(path.join(dir, 'moviepy-config.json'), (p) =>
-          report('moviepy', 58 + p * 0.12, 'MoviePy rendering...'),
+        await runMoviePyPipeline(
+          path.join(dir, 'moviepy-config.json'),
+          (p) => report('moviepy', 58 + p * 0.12, 'MoviePy rendering...'),
+          renderJob,
         );
       }
 
@@ -428,10 +494,21 @@ export class RenderPipeline {
 
       return project;
     } catch (err) {
+      if (err instanceof RenderCancelledError || renderJob.cancelled) {
+        project.status = 'cancelled';
+        project.stage = 'cancelled';
+        project.message = 'Render stopped';
+        project.cancelledAt = new Date().toISOString();
+        delete project.error;
+        fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+        return project;
+      }
       project.status = 'failed';
       project.error = err.message;
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
       throw err;
+    } finally {
+      this.jobs.delete(projectId);
     }
   }
 }

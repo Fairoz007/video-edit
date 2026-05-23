@@ -44,7 +44,16 @@ function Bracket({
 
 export const CornerBrackets: React.FC = () => {
   const theme = useVisualTemplate();
-  if (!theme.cornerBrackets) return null;
+  const bracket =
+    typeof theme.cornerBrackets === 'object'
+      ? theme.cornerBrackets
+      : {
+          enabled: Boolean(theme.cornerBrackets),
+          color: theme.bracketColor || theme.palette.primary,
+          size: BRACKET_SIZE,
+          weight: STROKE,
+        };
+  if (!bracket.enabled) return null;
 
   const frame = useCurrentFrame();
   const draw = drawInProgress(frame, 6, 20);
@@ -52,8 +61,8 @@ export const CornerBrackets: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
-      <Bracket corner="top_left" drawProgress={draw} opacity={opacity} color={theme.bracketColor} />
-      <Bracket corner="bottom_right" drawProgress={draw} opacity={opacity} color={theme.bracketColor} />
+      <Bracket corner="top_left" drawProgress={draw} opacity={opacity} color={bracket.color} />
+      <Bracket corner="bottom_right" drawProgress={draw} opacity={opacity} color={bracket.color} />
     </AbsoluteFill>
   );
 };

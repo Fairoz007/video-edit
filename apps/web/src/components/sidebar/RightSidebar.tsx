@@ -26,7 +26,8 @@ interface Props {
 
 export function RightSidebar({ overlay }: Props) {
   const { status, exportOptions, voiceSettings, input } = useProjectStore();
-  const { startRenderFlow } = useDocumentaryPipeline();
+  const { startRenderFlow, cancelRenderFlow } = useDocumentaryPipeline();
+  const isRendering = status === 'rendering';
   const videoOnly = isVideoOnlyEditMode(input.editMode);
   const {
     activeRightPanel,
@@ -143,18 +144,29 @@ export function RightSidebar({ overlay }: Props) {
         </AnimatePresence>
       </div>
 
-      <motion.div className="p-4 border-t border-forge-border shrink-0 bg-forge-surface/50">
-        <motion.button
-          type="button"
-          onClick={() => startRenderFlow()}
-          disabled={status === 'rendering'}
-          className="w-full py-3 rounded-studio accent-gradient font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-        >
-          <Rocket className="w-4 h-4" />
-          {status === 'rendering' ? 'Rendering...' : 'Render documentary'}
-        </motion.button>
+      <motion.div className="p-4 border-t border-forge-border shrink-0 bg-forge-surface/50 space-y-2">
+        {isRendering ? (
+          <motion.button
+            type="button"
+            onClick={() => cancelRenderFlow()}
+            className="w-full py-3 rounded-studio border border-red-500/40 text-red-300 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-red-500/10"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            Stop render
+          </motion.button>
+        ) : (
+          <motion.button
+            type="button"
+            onClick={() => startRenderFlow()}
+            className="w-full py-3 rounded-studio accent-gradient font-semibold text-sm flex items-center justify-center gap-2"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            <Rocket className="w-4 h-4" />
+            Render documentary
+          </motion.button>
+        )}
         <p className="text-[10px] text-center text-forge-muted mt-2">
           {videoOnly ? 'Video only' : `${voiceSettings.rate} WPM`} | {input.videoStyle || 'documentary'} |{' '}
           {exportOptions.preset}

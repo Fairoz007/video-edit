@@ -12,7 +12,12 @@ import {
 } from '../services/voicePreviewCache.js';
 import { writeSubtitles } from '../services/subtitleGenerator.js';
 import { buildTimeline } from '../services/timelineBuilder.js';
-import { listDocumentaryTemplates } from '@docuforge/config/documentaryTemplates';
+import {
+  getDocumentaryTemplate,
+  getIntroGraphicSec,
+  listDocumentaryTemplates,
+  resolveVisualTheme,
+} from '@docuforge/config/documentaryTemplates';
 import { projectDir } from '../utils/paths.js';
 import fs from 'fs';
 import path from 'path';
@@ -148,11 +153,17 @@ export function createPipelineRouter(root) {
   });
 
   router.post('/timeline', (req, res) => {
-    const { script, media, audioTracks, audioDurationSec, editMode } = req.body;
+    const { script, media, audioTracks, audioDurationSec, editMode, templateId } = req.body;
+    const docTemplate = getDocumentaryTemplate(templateId);
+    const visualTheme = resolveVisualTheme(docTemplate);
+    const introGraphicSec = getIntroGraphicSec(docTemplate.id);
     const timeline = buildTimeline(script, media, audioTracks, {
       audioDurationSec,
       editMode,
       videoOnly: editMode === 'video-only',
+      templateId: docTemplate.id,
+      visualTheme,
+      introGraphicSec,
     });
     res.json(timeline);
   });

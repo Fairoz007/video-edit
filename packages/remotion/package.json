@@ -9,16 +9,22 @@
     "render:walkthrough": "remotion render index.ts Walkthrough ../../out/walkthrough-preview.mp4"
   },
   "dependencies": {
-    "@remotion/captions": "4.0.462",
-    "@remotion/google-fonts": "^4.0.462",
-    "@remotion/media": "^4.0.462",
-    "@remotion/transitions": "^4.0.462",
+    "@remotion/animation-utils": "4.0.465",
+    "@remotion/captions": "4.0.465",
+    "@remotion/effects": "4.0.465",
+    "@remotion/google-fonts": "4.0.465",
+    "@remotion/light-leaks": "4.0.465",
+    "@remotion/media": "4.0.465",
+    "@remotion/motion-blur": "4.0.465",
+    "@remotion/noise": "4.0.465",
+    "@remotion/shapes": "4.0.465",
+    "@remotion/transitions": "4.0.465",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "remotion": "^4.0.462"
+    "remotion": "4.0.465"
   },
   "devDependencies": {
-    "@remotion/cli": "^4.0.462",
+    "@remotion/cli": "4.0.465",
     "typescript": "^5.7.2"
   }
 }

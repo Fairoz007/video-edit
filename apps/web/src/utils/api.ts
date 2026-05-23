@@ -125,6 +125,15 @@ export const startRender = (payload: {
 export const getRenderStatus = (projectId: string) =>
   api.get(`/render/status/${projectId}`);
 
+export const cancelRender = (projectId: string) =>
+  api.post<{ projectId: string; cancelled: boolean }>(`/render/cancel/${projectId}`);
+
+export const restartRender = (payload: {
+  projectId?: string;
+  input: DocumentaryInput;
+  options?: ExportOptions;
+}) => api.post('/render/restart', payload);
+
 export const getLatestExport = () =>
   api.get<{ filename: string | null; outputPath: string | null; size?: number }>(
     '/exports/latest',
@@ -187,4 +196,13 @@ export interface TimelineScene {
   media?: { localPath?: string; url?: string; type?: string };
   transition?: string;
   effect?: string;
+}
+
+export interface TimelineResult {
+  scenes: TimelineScene[];
+  totalDuration: number;
+  introGraphicSec?: number;
+  templateId?: string;
+  videoOnly?: boolean;
+  sections?: ScriptSection[];
 }

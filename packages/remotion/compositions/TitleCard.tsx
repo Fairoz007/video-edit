@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
 
 export interface TitleCardProps {
+  [key: string]: unknown;
   title: string;
   subtitle?: string;
 }

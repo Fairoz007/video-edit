@@ -18,13 +18,15 @@ const BadgeContent: React.FC<{
   const badge = theme.chapterBadge;
   const frame = useCurrentFrame();
   const enterFrames = 15;
+  const exitFrames = 12;
+  const safeDuration = Math.max(enterFrames + exitFrames + 1, durationFrames);
+  const exitDelayFrames = Number(badge.exitDelayFrames) || 60;
   const exitDelay = Math.max(
     enterFrames + 20,
-    durationFrames - badge.exitDelayFrames,
+    safeDuration - exitDelayFrames,
   );
-  const exitFrames = 12;
 
-  const opacity = slideFadeOpacity(frame, enterFrames, exitDelay, exitFrames, durationFrames);
+  const opacity = slideFadeOpacity(frame, enterFrames, exitDelay, exitFrames, safeDuration);
   const x =
     badge.style === 'serif_tag' || badge.style === 'editorial_category'
       ? 0

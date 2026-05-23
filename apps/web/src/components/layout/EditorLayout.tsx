@@ -15,10 +15,7 @@ export function EditorLayout() {
   const { mobilePanel, syncLayout, closeMobilePanels } = useUiStore();
   const isMobile = bp === 'mobile';
 
-  useRenderPolling(
-    projectId,
-    status === 'rendering' || Boolean(projectId && !outputPath && status !== 'failed'),
-  );
+  useRenderPolling(projectId, status === 'rendering');
 
   useEffect(() => {
     syncLayout(bp);

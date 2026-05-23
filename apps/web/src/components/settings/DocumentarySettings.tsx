@@ -1,5 +1,6 @@
 import { Clapperboard } from 'lucide-react';
 import { useProjectStore } from '../../hooks/useProjectStore';
+import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
 import type { EditMode, VideoStyle } from '../../utils/api';
 import {
   DEFAULT_TEMPLATE_ID,
@@ -34,7 +35,8 @@ const VIDEO_STYLES: { id: VideoStyle; label: string; hint: string }[] = [
 
 
 export function DocumentarySettings() {
-  const { script, input, setInput } = useProjectStore();
+  const { script, input, setInput, media } = useProjectStore();
+  const { rebuildTimelineFlow } = useDocumentaryPipeline();
 
   return (
     <section className="p-3 rounded-xl bg-black/30 border border-forge-border/40">
@@ -47,7 +49,13 @@ export function DocumentarySettings() {
       <select
         className="input-field text-xs mb-2.5 w-full"
         value={input.editMode || 'with-narration'}
-        onChange={(e) => setInput({ editMode: e.target.value as EditMode })}
+        onChange={async (e) => {
+          const editMode = e.target.value as EditMode;
+          setInput({ editMode });
+          if (script && media.length > 0) {
+            await rebuildTimelineFlow({ editMode });
+          }
+        }}
       >
         {EDIT_MODES.map((m) => (
           <option key={m.id} value={m.id}>
@@ -84,9 +92,13 @@ export function DocumentarySettings() {
         className="input-field text-xs mb-2.5 w-full"
         value={input.templateId || DEFAULT_TEMPLATE_ID}
         disabled={input.videoStyle === 'walkthrough'}
-        onChange={(e) =>
-          setInput({ templateId: e.target.value, videoStyle: 'documentary' })
-        }
+        onChange={async (e) => {
+          const templateId = e.target.value;
+          setInput({ templateId, videoStyle: 'documentary' });
+          if (script && media.length > 0) {
+            await rebuildTimelineFlow({ templateId, videoStyle: 'documentary' });
+          }
+        }}
       >
         {DOCUMENTARY_VISUAL_TEMPLATES.map((t) => (
           <option key={t.id} value={t.id}>

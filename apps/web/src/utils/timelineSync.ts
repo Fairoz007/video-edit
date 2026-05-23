@@ -1,4 +1,5 @@
-import type { ScriptSection, TimelineScene } from './api';
+import { getTemplateIntroSec } from '../constants/documentaryTemplates';
+import type { ScriptSection, TimelineResult, TimelineScene } from './api';
 
 export interface TimelineTrackItem {
   id: string;
@@ -10,11 +11,21 @@ export interface TimelineTrackItem {
 }
 
 /** Narration blocks aligned to video scene timestamps (or cumulative section durations). */
+export function resolveIntroOffsetSec(
+  timeline: Pick<TimelineResult, 'introGraphicSec' | 'templateId'> | null | undefined,
+  templateId?: string,
+): number {
+  if (timeline?.introGraphicSec != null && timeline.introGraphicSec > 0) {
+    return timeline.introGraphicSec;
+  }
+  return getTemplateIntroSec(timeline?.templateId || templateId);
+}
+
 export function buildNarrationTrackItems(
   sections: ScriptSection[],
   scenes: TimelineScene[],
   totalDuration: number,
-  introOffsetSec = 5,
+  introOffsetSec = 3,
 ): TimelineTrackItem[] {
   if (!sections.length) return [];
 

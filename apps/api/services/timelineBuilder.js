@@ -285,6 +285,8 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
     contentDuration: contentEnd,
     audioDurationSec: audioDurationSec || null,
     videoOnly,
+    templateId,
+    introGraphicSec,
     sections: syncedSections,
     fps: 30,
     tracks: {

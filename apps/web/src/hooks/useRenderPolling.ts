@@ -64,6 +64,11 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
           setStatus('failed');
           setError(data.error || data.message || 'Render failed');
           clearInterval(intervalRef.current);
+        } else if (data.status === 'cancelled' || data.stage === 'cancelled') {
+          setStatus('idle');
+          setProgress(0, 'cancelled', data.message || 'Render stopped');
+          setError(null);
+          clearInterval(intervalRef.current);
         } else {
           setStatus('rendering');
         }
