@@ -29,6 +29,7 @@ export function Timeline() {
           start: s.start,
           duration: s.duration,
           label: s.media?.localPath?.split(/[/\\]/).pop() || s.sectionId,
+          meta: formatClipMeta(s),
           color: 'from-indigo-700 via-indigo-600 to-violet-700',
           waveform: false,
         }))
@@ -148,4 +149,12 @@ function formatRuler(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatClipMeta(scene: { trimStart?: number; trimEnd?: number; playbackRate?: number; duration: number }): string {
+  const parts = [`cut ${scene.duration.toFixed(1)}s`];
+  if (scene.trimStart && scene.trimStart > 0) parts.push(`in ${scene.trimStart.toFixed(1)}s`);
+  if (scene.trimEnd && scene.trimEnd > 0) parts.push(`out -${scene.trimEnd.toFixed(1)}s`);
+  if (scene.playbackRate && scene.playbackRate !== 1) parts.push(`${scene.playbackRate.toFixed(2)}x`);
+  return parts.join(' | ');
 }

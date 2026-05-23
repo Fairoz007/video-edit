@@ -36,6 +36,46 @@ function mediaKey(item) {
   return item?.localPath || item?.url || '';
 }
 
+function mediaDurationSec(item) {
+  const duration = Number(item?.duration || item?.durationSec || item?.metadata?.duration);
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+}
+
+function buildClipEdit(asset, targetDuration, options = {}) {
+  const playbackRate = Number(options.playbackRate || asset?.playbackRate || 1);
+  const safePlaybackRate = Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1;
+  const sourceDuration = mediaDurationSec(asset);
+  const isVideo = asset?.type === 'video';
+
+  if (!isVideo || !sourceDuration) {
+    return {
+      duration: targetDuration,
+      trimStart: 0,
+      trimEnd: 0,
+      playbackRate: safePlaybackRate,
+      loop: false,
+      audioVolume: 0,
+    };
+  }
+
+  const requestedStart = Number(asset.trimStart || asset.inPoint || asset.startOffset || 0);
+  const trimStart = Math.max(0, Math.min(requestedStart, Math.max(0, sourceDuration - 0.5)));
+  const playableAfterStart = Math.max(0.1, sourceDuration - trimStart);
+  const sourceNeeded = targetDuration * safePlaybackRate;
+  const trimEnd = Math.max(0, playableAfterStart - sourceNeeded);
+  const editedSourceLength = Math.max(0.1, playableAfterStart - trimEnd);
+  const editedTimelineDuration = editedSourceLength / safePlaybackRate;
+
+  return {
+    duration: Math.max(0.5, Math.min(targetDuration, editedTimelineDuration)),
+    trimStart,
+    trimEnd,
+    playbackRate: safePlaybackRate,
+    loop: editedTimelineDuration < targetDuration * 0.85,
+    audioVolume: Number.isFinite(Number(asset.audioVolume)) ? Number(asset.audioVolume) : 0,
+  };
+}
+
 /** Pick clips for a section — prefer section-tagged stock from script-aligned search. */
 function pickClipsForSection(section, pool, clipCount, usedKeys, globalTerms = []) {
   const available = pool.filter((m) => {
@@ -69,6 +109,25 @@ function pickClipsForSection(section, pool, clipCount, usedKeys, globalTerms = [
     picked.push(choice.item);
   }
   return picked;
+}
+
+function pickFallbackClip(pool, usedKeys, fallbackIndex) {
+  if (!pool.length) return { asset: null, nextIndex: fallbackIndex };
+
+  for (let attempts = 0; attempts < pool.length; attempts++) {
+    const idx = (fallbackIndex + attempts) % pool.length;
+    const asset = pool[idx];
+    const key = mediaKey(asset);
+    if (key && !usedKeys.has(key)) {
+      usedKeys.add(key);
+      return { asset, nextIndex: idx + 1 };
+    }
+  }
+
+  return {
+    asset: pool[fallbackIndex % pool.length],
+    nextIndex: fallbackIndex + 1,
+  };
 }
 
 function transitionListForTemplate(visualTheme) {
@@ -144,26 +203,34 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
       globalMatchTerms,
     );
     if (sectionClips.length < clipCount) {
-      while (sectionClips.length < clipCount) {
-        const asset = pool[fallbackMediaIndex % pool.length];
-        fallbackMediaIndex++;
-        const key = mediaKey(asset);
-        if (!key || usedMediaKeys.has(key)) continue;
-        usedMediaKeys.add(key);
-        sectionClips.push(asset);
+      while (sectionClips.length < clipCount && pool.length > 0) {
+        const fallback = pickFallbackClip(pool, usedMediaKeys, fallbackMediaIndex);
+        fallbackMediaIndex = fallback.nextIndex;
+        if (!fallback.asset) break;
+        sectionClips.push(fallback.asset);
       }
     }
 
     for (let j = 0; j < clipCount; j++) {
-      const asset = sectionClips[j] || pool[fallbackMediaIndex++ % pool.length];
-      const duration = Math.max(2.5, clipDuration);
+      const fallback = sectionClips[j]
+        ? { asset: sectionClips[j], nextIndex: fallbackMediaIndex }
+        : pickFallbackClip(pool, usedMediaKeys, fallbackMediaIndex);
+      fallbackMediaIndex = fallback.nextIndex;
+      const asset = fallback.asset;
+      if (!asset) continue;
+      const edit = buildClipEdit(asset, Math.max(2.5, clipDuration));
       const atSectionEdge = j === 0 || j === clipCount - 1;
       scenes.push({
         id: `scene-${i}-${j}`,
         sectionId: section.id,
         sectionIndex: i,
         start: timeCursor,
-        duration,
+        duration: edit.duration,
+        trimStart: edit.trimStart,
+        trimEnd: edit.trimEnd,
+        playbackRate: edit.playbackRate,
+        loop: edit.loop,
+        audioVolume: edit.audioVolume,
         media: asset,
         transition: atSectionEdge ? 'crossfade' : TRANSITIONS[(i + j) % TRANSITIONS.length],
         effect: asset.type === 'image' ? 'ken-burns' : 'none',
@@ -190,7 +257,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
         kenBurnsFrom,
         kenBurnsTo,
       });
-      timeCursor += duration;
+      timeCursor += edit.duration;
     }
   }
 
@@ -255,13 +322,19 @@ export function buildWalkthroughTimeline(script, mediaManifest, options = {}) {
     const section =
       sections.find((s) => s.id === asset.sectionId) ||
       sections[i % Math.max(1, sections.length)];
+    const edit = buildClipEdit(asset, secPerScreen);
     return {
       id: `screen-${i}`,
       title: section?.title || asset.title || `Screen ${i + 1}`,
       description: section?.narration?.slice(0, 120) || asset.alt || '',
       src: asset.localPath || asset.url,
       type: asset.type || 'image',
-      duration: secPerScreen,
+      duration: edit.duration,
+      trimStart: edit.trimStart,
+      trimEnd: edit.trimEnd,
+      playbackRate: edit.playbackRate,
+      loop: edit.loop,
+      audioVolume: edit.audioVolume,
       transition: WALKTHROUGH_TRANSITIONS[i % WALKTHROUGH_TRANSITIONS.length],
     };
   });

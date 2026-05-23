@@ -60,6 +60,30 @@ def resize_clip(clip, size):
     return clip.resize(size)
 
 
+def set_clip_duration(clip, duration):
+    if MOVIEPY_V2:
+        return clip.with_duration(duration)
+    return clip.set_duration(duration)
+
+
+def set_clip_audio_volume(clip, volume):
+    if volume > 0:
+        return clip
+    if MOVIEPY_V2:
+        return clip.without_audio()
+    return clip.without_audio()
+
+
+def apply_playback_rate(clip, playback_rate):
+    if abs(playback_rate - 1.0) < 0.001:
+        return clip
+    if MOVIEPY_V2:
+        return clip.time_transform(lambda t: t * playback_rate).with_duration(
+            clip.duration / playback_rate
+        )
+    return clip.fl_time(lambda t: t * playback_rate).set_duration(clip.duration / playback_rate)
+
+
 def ken_burns(clip, zoom=1.12):
     """Slow zoom on stills."""
     if MOVIEPY_V2:
@@ -137,6 +161,11 @@ def build_scene(scene, size):
         return None
 
     duration = float(scene.get("duration", 5))
+    trim_start = max(0.0, float(scene.get("trimStart", 0) or 0))
+    trim_end = max(0.0, float(scene.get("trimEnd", 0) or 0))
+    playback_rate = max(0.05, float(scene.get("playbackRate", 1) or 1))
+    loop = bool(scene.get("loop", False))
+    audio_volume = max(0.0, min(1.0, float(scene.get("audioVolume", 0) or 0)))
     media_type = scene.get("type", "image")
     transition = scene.get("transition", "crossfade")
     effect = scene.get("effect", "ken-burns")
@@ -151,11 +180,17 @@ def build_scene(scene, size):
     if use_video:
         try:
             clip = VideoFileClip(str(path))
-            end = min(duration, clip.duration or duration)
+            source_duration = clip.duration or duration
+            end = max(trim_start + 0.1, source_duration - trim_end)
+            end = min(end, trim_start + duration * playback_rate, source_duration)
             if MOVIEPY_V2:
-                clip = clip.subclipped(0, end)
+                clip = clip.subclipped(trim_start, end)
             else:
-                clip = clip.subclip(0, end)
+                clip = clip.subclip(trim_start, end)
+            clip = apply_playback_rate(clip, playback_rate)
+            target_duration = duration if loop else min(duration, max(0.1, clip.duration))
+            clip = set_clip_duration(clip, target_duration)
+            clip = set_clip_audio_volume(clip, audio_volume)
             clip = resize_clip(clip, size)
             clip = apply_slide_offset(clip, transition)
             fade_dur = 0.65 if transition in ("crossfade", "fade") else 0.45

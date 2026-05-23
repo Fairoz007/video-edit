@@ -99,6 +99,12 @@
       transition-all duration-150;
   }
 
+  .quick-action {
+    @apply shrink-0 inline-flex items-center justify-center gap-1.5 min-h-9 px-3
+      rounded-studio border text-xs font-semibold transition-all duration-150
+      disabled:cursor-not-allowed whitespace-nowrap;
+  }
+
   .input-field {
     @apply w-full bg-forge-surface border border-forge-border rounded-studio px-3.5 py-2.5
       text-sm text-forge-text placeholder-forge-muted focus:outline-none

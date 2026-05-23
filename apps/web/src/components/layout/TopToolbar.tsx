@@ -40,7 +40,7 @@ export function TopToolbar() {
 
   return (
     <header
-      className="h-12 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-forge-border bg-forge-surface/90 backdrop-blur-xl"
+      className="h-14 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-forge-border bg-forge-surface/95 backdrop-blur-xl"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <motion.div
@@ -48,7 +48,15 @@ export function TopToolbar() {
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         {bp !== 'desktop' && (
-          <button type="button" onClick={toggleLeftPanel} className="btn-icon" aria-label="Projects panel">
+          <button
+            type="button"
+            onClick={() => {
+              if (bp === 'mobile') setMobilePanel('left');
+              else toggleLeftPanel();
+            }}
+            className="btn-icon"
+            aria-label="Projects panel"
+          >
             <PanelLeft className="w-4 h-4" />
           </button>
         )}
@@ -62,7 +70,7 @@ export function TopToolbar() {
             {leftPanelOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
           </button>
         )}
-        <motion.div className="w-8 h-8 rounded-studio accent-gradient flex items-center justify-center">
+        <motion.div className="w-9 h-9 rounded-studio accent-gradient flex items-center justify-center shadow-glow-sm">
           <Film className="w-4 h-4 text-white" />
         </motion.div>
         <motion.div className="hidden md:block">
@@ -70,7 +78,7 @@ export function TopToolbar() {
             <span className="text-gradient">Docu</span>
             <span className="text-forge-text">Forge</span>
           </span>
-          <p className="text-[10px] text-forge-muted uppercase tracking-[0.18em] -mt-0.5 hidden lg:block">
+          <p className="text-[10px] text-forge-muted uppercase tracking-[0.14em] -mt-0.5 hidden lg:block">
             Production Studio
           </p>
         </motion.div>
@@ -105,7 +113,7 @@ export function TopToolbar() {
 
         <motion.div className="hidden lg:flex items-center gap-1.5 mr-2 px-2.5 py-1 rounded-studio bg-emerald-500/10 border border-emerald-500/15">
           <Cloud className={`w-3.5 h-3.5 ${saved ? 'text-emerald-400' : 'text-amber-400 animate-pulse'}`} />
-          <span className="text-xs font-medium text-emerald-400/90">{saved ? 'Saved' : 'Saving…'}</span>
+          <span className="text-xs font-medium text-emerald-400/90">{saved ? 'Saved' : 'Saving...'}</span>
         </motion.div>
 
         {isRendering && (

@@ -89,6 +89,33 @@ export async function verifyReadableVideo(filePath) {
   }
 }
 
+/** Return media duration in seconds when ffprobe can read it. */
+export async function getMediaDurationSec(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  const ffprobe = findFfprobePath();
+  if (!ffprobe) return null;
+
+  try {
+    const { stdout } = await execFileAsync(
+      ffprobe,
+      [
+        '-v',
+        'error',
+        '-show_entries',
+        'format=duration',
+        '-of',
+        'default=noprint_wrappers=1:nokey=1',
+        filePath,
+      ],
+      { timeout: 30_000, maxBuffer: 256 * 1024 },
+    );
+    const duration = Number.parseFloat(stdout.trim());
+    return Number.isFinite(duration) && duration > 0 ? duration : null;
+  } catch {
+    return null;
+  }
+}
+
 export function verifyReadableImage(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return false;
   const stat = fs.statSync(filePath);
@@ -114,7 +141,8 @@ export async function sanitizeMediaAsset(item) {
 
   if (declaredVideo) {
     if (await verifyReadableVideo(path)) {
-      return { ...item, type: 'video' };
+      const duration = item.duration || (await getMediaDurationSec(path));
+      return { ...item, type: 'video', ...(duration ? { duration } : {}) };
     }
     if (verifyReadableImage(path)) {
       console.warn(`[media] Reclassified as image (invalid video): ${path}`);
@@ -168,6 +196,9 @@ export async function prepareMoviePyScene(scene) {
   return {
     path,
     duration: scene.duration,
+    trimStart: scene.trimStart || 0,
+    trimEnd: scene.trimEnd || 0,
+    playbackRate: scene.playbackRate || 1,
     type,
     transition: scene.transition || 'crossfade',
     effect: scene.effect || (type === 'image' ? 'ken-burns' : 'none'),

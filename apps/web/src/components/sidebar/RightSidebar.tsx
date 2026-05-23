@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Layers, Scan, Sparkles, Rocket, X, ChevronRight } from 'lucide-react';
 import { DocumentarySettings } from '../settings/DocumentarySettings';
@@ -11,7 +10,7 @@ import { InspectorPanel } from '../panels/InspectorPanel';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
 import { isVideoOnlyEditMode } from '../../utils/timelineSync';
-import { useUiStore } from '../../hooks/useUiStore';
+import { useUiStore, type RightPanelId } from '../../hooks/useUiStore';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 const TABS = [
@@ -21,22 +20,32 @@ const TABS = [
   { id: 'ai', label: 'AI', icon: Sparkles },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
-
 interface Props {
   overlay?: boolean;
 }
 
 export function RightSidebar({ overlay }: Props) {
-  const [tab, setTab] = useState<TabId>('settings');
   const { status, exportOptions, voiceSettings, input } = useProjectStore();
   const { startRenderFlow } = useDocumentaryPipeline();
   const videoOnly = isVideoOnlyEditMode(input.editMode);
-  const { rightPanelOpen, mobilePanel, closeMobilePanels, setMobilePanel, toggleRightPanel } =
+  const {
+    activeRightPanel,
+    rightPanelOpen,
+    mobilePanel,
+    closeMobilePanels,
+    setMobilePanel,
+    toggleRightPanel,
+    setActiveRightPanel,
+  } =
     useUiStore();
   const bp = useBreakpoint();
 
   const showPanel = overlay ? mobilePanel === 'right' : rightPanelOpen;
+  const selectTab = (id: RightPanelId) => {
+    setActiveRightPanel(id);
+    if (overlay) setMobilePanel('right');
+    else if (!rightPanelOpen) toggleRightPanel();
+  };
 
   if (!showPanel && !overlay) {
     return (
@@ -55,7 +64,7 @@ export function RightSidebar({ overlay }: Props) {
             title={label}
             onClick={() => {
               toggleRightPanel();
-              setTab(id);
+              setActiveRightPanel(id);
             }}
             className="glass-nav btn-icon p-2.5"
           >
@@ -82,15 +91,15 @@ export function RightSidebar({ overlay }: Props) {
           <button
             key={id}
             type="button"
-            onClick={() => setTab(id)}
-            className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-studio transition-all text-[10px] font-semibold uppercase tracking-wide ${
-              tab === id
+            onClick={() => selectTab(id)}
+            className={`flex-1 min-w-[64px] flex items-center justify-center gap-1.5 py-2 px-2 rounded-studio transition-all text-[10px] font-semibold uppercase tracking-wide ${
+              activeRightPanel === id
                 ? 'bg-white/[0.08] text-forge-text border border-forge-border-strong'
                 : 'text-forge-muted hover:text-forge-text-secondary hover:bg-white/[0.04] border border-transparent'
             }`}
           >
             <Icon className="w-4 h-4" />
-            <span className="hidden lg:inline">{label}</span>
+            <span className="hidden 2xl:inline">{label}</span>
           </button>
         ))}
         {!overlay && (
@@ -102,7 +111,7 @@ export function RightSidebar({ overlay }: Props) {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         <AnimatePresence mode="wait">
-          {tab === 'settings' && (
+          {activeRightPanel === 'settings' && (
             <motion.div
               key="settings"
               initial={{ opacity: 0, x: 6 }}
@@ -116,17 +125,17 @@ export function RightSidebar({ overlay }: Props) {
               <ExportSettings />
             </motion.div>
           )}
-          {tab === 'scenes' && (
+          {activeRightPanel === 'scenes' && (
             <motion.div key="scenes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <ScenesPanel />
             </motion.div>
           )}
-          {tab === 'inspector' && (
+          {activeRightPanel === 'inspector' && (
             <motion.div key="inspector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <InspectorPanel />
             </motion.div>
           )}
-          {tab === 'ai' && (
+          {activeRightPanel === 'ai' && (
             <motion.div key="ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <AIEnhancementTools />
             </motion.div>
@@ -144,10 +153,10 @@ export function RightSidebar({ overlay }: Props) {
           whileTap={{ scale: 0.99 }}
         >
           <Rocket className="w-4 h-4" />
-          {status === 'rendering' ? 'Rendering…' : 'Render documentary'}
+          {status === 'rendering' ? 'Rendering...' : 'Render documentary'}
         </motion.button>
         <p className="text-[10px] text-center text-forge-muted mt-2">
-          {videoOnly ? 'Video only' : `${voiceSettings.rate} WPM`} · {input.videoStyle || 'documentary'} ·{' '}
+          {videoOnly ? 'Video only' : `${voiceSettings.rate} WPM`} | {input.videoStyle || 'documentary'} |{' '}
           {exportOptions.preset}
         </p>
       </motion.div>

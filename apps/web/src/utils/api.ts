@@ -179,6 +179,11 @@ export interface TimelineScene {
   sectionId: string;
   start: number;
   duration: number;
+  trimStart?: number;
+  trimEnd?: number;
+  playbackRate?: number;
+  loop?: boolean;
+  audioVolume?: number;
   media?: { localPath?: string; url?: string; type?: string };
   transition?: string;
   effect?: string;

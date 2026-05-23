@@ -12,6 +12,11 @@ export interface Scene {
   src: string;
   type?: 'image' | 'video';
   duration: number;
+  trimStart?: number;
+  trimEnd?: number;
+  playbackRate?: number;
+  loop?: boolean;
+  audioVolume?: number;
   caption?: string;
   sectionTitle?: string;
   sectionIndex?: number;
@@ -41,9 +46,15 @@ export interface WalkthroughScreen {
   title: string;
   description?: string;
   src: string;
+  type?: 'image' | 'video';
   width?: number;
   height?: number;
   duration: number;
+  trimStart?: number;
+  trimEnd?: number;
+  playbackRate?: number;
+  loop?: boolean;
+  audioVolume?: number;
   transition?: TransitionKind;
   hotspots?: { x: number; y: number; label: string }[];
 }

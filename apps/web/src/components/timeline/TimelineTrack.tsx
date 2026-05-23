@@ -6,6 +6,7 @@ export interface TimelineItem {
   start: number;
   duration: number;
   label: string;
+  meta?: string;
   color: string;
   waveform?: boolean;
 }
@@ -71,8 +72,13 @@ export function TimelineTrack({
               {item.waveform ? (
                 <WaveformVisualization bars={Math.min(40, Math.max(12, Math.floor(width * 2)))} />
               ) : (
-                <span className="absolute inset-0 flex items-center px-2 text-[10px] font-medium text-white/90 truncate">
-                  {item.label}
+                <span className="absolute inset-0 flex flex-col justify-center px-2 text-white/90 truncate">
+                  <span className="text-[10px] font-medium truncate">{item.label}</span>
+                  {item.meta && (
+                    <span className="text-[9px] font-mono text-white/60 truncate">
+                      {item.meta}
+                    </span>
+                  )}
                 </span>
               )}
             </motion.div>

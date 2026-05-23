@@ -266,6 +266,11 @@ export class RenderPipeline {
           scenes: walkthrough.screens.map((s) => ({
             id: s.id,
             duration: s.duration,
+            trimStart: s.trimStart || 0,
+            trimEnd: s.trimEnd || 0,
+            playbackRate: s.playbackRate || 1,
+            loop: Boolean(s.loop),
+            audioVolume: s.audioVolume || 0,
             media: { localPath: s.src, type: s.type },
             transition: s.transition,
           })),

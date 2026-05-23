@@ -38,7 +38,8 @@ export const WalkthroughScreenSlide: React.FC<WalkthroughScreenSlideProps> = ({
     config: { damping: 10 },
   });
 
-  const isVideo = screen.src.match(/\.(mp4|webm|mov)(\?|$)/i);
+  const isVideo =
+    screen.type === 'video' || Boolean(screen.src.match(/\.(mp4|webm|mov)(\?|$)/i));
 
   return (
     <AbsoluteFill
@@ -62,7 +63,15 @@ export const WalkthroughScreenSlide: React.FC<WalkthroughScreenSlideProps> = ({
         }}
       >
         {isVideo ? (
-          <Video src={src} style={{ width: '100%', height: 'auto', display: 'block' }} muted />
+          <Video
+            src={src}
+            style={{ width: '100%', height: 'auto', display: 'block' }}
+            trimBefore={Math.max(0, Math.round((screen.trimStart || 0) * fps))}
+            playbackRate={screen.playbackRate || 1}
+            loop={screen.loop}
+            volume={screen.audioVolume || 0}
+            muted={(screen.audioVolume || 0) <= 0}
+          />
         ) : (
           <Img src={src} style={{ width: '100%', height: 'auto', display: 'block' }} />
         )}

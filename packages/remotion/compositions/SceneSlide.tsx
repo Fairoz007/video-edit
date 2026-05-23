@@ -78,7 +78,16 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
         />
       )}
       {scene.type === 'video' ? (
-        <Video src={src} objectFit="cover" style={mediaStyle} muted />
+        <Video
+          src={src}
+          objectFit="cover"
+          style={mediaStyle}
+          trimBefore={Math.max(0, Math.round((scene.trimStart || 0) * fps))}
+          playbackRate={scene.playbackRate || 1}
+          loop={scene.loop}
+          volume={scene.audioVolume || 0}
+          muted={(scene.audioVolume || 0) <= 0}
+        />
       ) : (
         <Img src={src} style={imageStyle} />
       )}

@@ -3,6 +3,8 @@ import type { Breakpoint } from './useBreakpoint';
 
 export type MobilePanel = 'none' | 'left' | 'right';
 export type WorkflowStepId = 1 | 2 | 3 | 4 | 5 | 6;
+export type LeftPanelId = 'projects' | 'media' | 'templates' | 'music' | 'subtitles' | 'settings';
+export type RightPanelId = 'settings' | 'scenes' | 'inspector' | 'ai';
 
 interface UiState {
   leftPanelOpen: boolean;
@@ -11,9 +13,14 @@ interface UiState {
   sourcePanelOpen: boolean;
   timelineExpanded: boolean;
   activeWorkflowStep: WorkflowStepId;
+  activeLeftPanel: LeftPanelId;
+  activeRightPanel: RightPanelId;
   syncLayout: (bp: Breakpoint) => void;
   setLeftPanelOpen: (open: boolean) => void;
   setRightPanelOpen: (open: boolean) => void;
+  setSourcePanelOpen: (open: boolean) => void;
+  setActiveLeftPanel: (panel: LeftPanelId) => void;
+  setActiveRightPanel: (panel: RightPanelId) => void;
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
   toggleSourcePanel: () => void;
@@ -27,9 +34,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   leftPanelOpen: true,
   rightPanelOpen: true,
   mobilePanel: 'none',
-  sourcePanelOpen: true,
+  sourcePanelOpen: false,
   timelineExpanded: true,
   activeWorkflowStep: 1,
+  activeLeftPanel: 'projects',
+  activeRightPanel: 'settings',
 
   syncLayout: (bp) => {
     if (bp === 'desktop') {
@@ -41,8 +50,11 @@ export const useUiStore = create<UiState>((set, get) => ({
     }
   },
 
-  setLeftPanelOpen: (open) => set({ leftPanelOpen: open, mobilePanel: open ? 'left' : 'none' }),
-  setRightPanelOpen: (open) => set({ rightPanelOpen: open, mobilePanel: open ? 'right' : 'none' }),
+  setLeftPanelOpen: (open) => set({ leftPanelOpen: open }),
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  setSourcePanelOpen: (open) => set({ sourcePanelOpen: open }),
+  setActiveLeftPanel: (panel) => set({ activeLeftPanel: panel }),
+  setActiveRightPanel: (panel) => set({ activeRightPanel: panel }),
 
   toggleLeftPanel: () => {
     const { mobilePanel, leftPanelOpen } = get();
