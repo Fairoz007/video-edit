@@ -72,7 +72,10 @@ function pickClipsForSection(section, pool, clipCount, usedKeys, globalTerms = [
 }
 
 function transitionListForTemplate(visualTheme) {
-  const t = visualTheme?.transitions?.defaultType || 'crossfade';
+  const t =
+    visualTheme?.transitions?.presentation ||
+    visualTheme?.transitions?.defaultType ||
+    'crossfade';
   if (t === 'wipe' || t === 'smash_cut') return ['wipe', 'wipe', 'crossfade', 'slide'];
   if (t === 'fade') return ['fade', 'fade', 'crossfade', 'fade'];
   return ['crossfade', 'crossfade', 'wipe', 'slide'];

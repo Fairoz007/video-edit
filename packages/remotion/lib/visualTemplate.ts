@@ -61,7 +61,14 @@ export interface VisualTheme {
     opacity: number;
   };
   lowerThird: { style: string; accentColor: string };
-  transitions: { defaultType: string; durationFrames: number };
+  transitions: {
+    presentation?: string;
+    defaultType?: string;
+    durationFrames: number;
+    slideDirection?: string;
+    wipeAngleDeg?: number;
+    flipDirection?: string;
+  };
   bgEffects: { scaleMin: number; scaleMax: number; durationMultiplier: number };
   outro: {
     style: string;
@@ -127,7 +134,7 @@ export const DEFAULT_VISUAL_THEME: VisualTheme = {
     opacity: 1,
   },
   lowerThird: { style: 'gradient_bar', accentColor: '#7C3AED' },
-  transitions: { defaultType: 'crossfade', durationFrames: 20 },
+  transitions: { presentation: 'fade', defaultType: 'crossfade', durationFrames: 20 },
   bgEffects: { scaleMin: 1.0, scaleMax: 1.08, durationMultiplier: 1.0 },
   outro: {
     style: 'cinematic_cta',

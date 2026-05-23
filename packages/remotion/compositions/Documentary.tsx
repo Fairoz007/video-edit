@@ -48,7 +48,7 @@ const DocumentaryScenes: React.FC<{
   scenes: Scene[];
   scale: number;
 }> = ({ scenes, scale }) => {
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const theme = useVisualTemplate();
   const transitionFrames = theme.transitions.durationFrames;
 
@@ -59,7 +59,9 @@ const DocumentaryScenes: React.FC<{
     duration: Math.max(2.5, scene.duration * scale),
     transition: (scene.transition ||
       mapTemplateTransitionType(
-        i % 2 === 0 ? theme.transitions.defaultType : 'crossfade',
+        i % 2 === 0
+          ? theme.transitions.presentation || theme.transitions.defaultType || 'fade'
+          : 'crossfade',
       )) as TransitionKind,
   }));
 
@@ -79,7 +81,15 @@ const DocumentaryScenes: React.FC<{
             </TransitionSeries.Sequence>
             {index < prepared.length - 1 && (
               <TransitionSeries.Transition
-                presentation={transitionPresentation(transitionKind) as never}
+                presentation={
+                  transitionPresentation(transitionKind, {
+                    slideDirection: theme.transitions.slideDirection,
+                    wipeAngleDeg: theme.transitions.wipeAngleDeg,
+                    flipDirection: theme.transitions.flipDirection,
+                    width,
+                    height,
+                  }) as never
+                }
                 timing={transitionTiming(transitionKind, transitionFrames)}
               />
             )}

@@ -1,10 +1,22 @@
 import { linearTiming, springTiming, type TransitionTiming } from '@remotion/transitions';
+import { clockWipe } from '@remotion/transitions/clock-wipe';
 import { fade } from '@remotion/transitions/fade';
+import { flip } from '@remotion/transitions/flip';
 import { slide } from '@remotion/transitions/slide';
 import { wipe } from '@remotion/transitions/wipe';
-import { flip } from '@remotion/transitions/flip';
 
-export type TransitionKind = 'fade' | 'crossfade' | 'slide' | 'zoom' | 'wipe' | 'flip';
+/** Remotion-native names from documentaryTemplates v2 VALID_TRANSITIONS */
+export type TransitionKind =
+  | 'fade'
+  | 'crossfade'
+  | 'slide'
+  | 'zoom'
+  | 'wipe'
+  | 'flip'
+  | 'clock'
+  | 'dissolve'
+  | 'ripple'
+  | 'none';
 
 const TRANSITION_DURATION = 20;
 
@@ -28,6 +40,15 @@ export function mapTemplateTransitionType(type: string): TransitionKind {
       return 'wipe';
     case 'slide':
       return 'slide';
+    case 'flip':
+      return 'flip';
+    case 'clock':
+      return 'clock';
+    case 'dissolve':
+    case 'ripple':
+      return 'dissolve';
+    case 'none':
+      return 'none';
     case 'zoom':
     case 'zoom_through':
       return 'zoom';
@@ -44,18 +65,39 @@ export function mapTemplateTransitionType(type: string): TransitionKind {
   }
 }
 
-export function transitionPresentation(kind: TransitionKind) {
+export function transitionPresentation(
+  kind: TransitionKind,
+  options?: {
+    slideDirection?: string;
+    wipeAngleDeg?: number;
+    flipDirection?: string;
+    width?: number;
+    height?: number;
+  },
+) {
+  const slideDir = (options?.slideDirection || 'from-right') as 'from-left' | 'from-right';
+  const flipDir = (options?.flipDirection || 'from-right') as 'from-left' | 'from-right';
+
   switch (kind) {
     case 'slide':
-      return slide({ direction: 'from-right' });
+      return slide({ direction: slideDir });
     case 'wipe':
-      return wipe();
+      return wipe({ direction: slideDir });
     case 'flip':
-      return flip();
+      return flip({ direction: flipDir });
+    case 'clock':
+      return clockWipe({
+        width: options?.width ?? 1920,
+        height: options?.height ?? 1080,
+      });
+    case 'dissolve':
+    case 'ripple':
     case 'zoom':
-      return fade();
     case 'crossfade':
     case 'fade':
+      return fade();
+    case 'none':
+      return fade();
     default:
       return fade();
   }
