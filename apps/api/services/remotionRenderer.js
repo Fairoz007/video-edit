@@ -18,7 +18,9 @@ import {
   getIntroGraphicSec,
   resolveVisualTheme,
 } from '@docuforge/config/documentaryTemplates';
+import { prepareRemotionScenes } from '../utils/sceneClipTiming.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { getResolution } from './videoRenderer.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
@@ -161,9 +163,13 @@ export function buildRemotionProps(project) {
   const sectionById = Object.fromEntries((script?.sections || []).map((s) => [s.id, s]));
 
   const transitions = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
-  const template = getDocumentaryTemplate(project.input?.templateId);
+  const template = getDocumentaryTemplate(
+    project.renderTemplateId || project.input?.templateId,
+  );
   const visualTheme = resolveVisualTheme(template);
   const fps = 30;
+  const preset = project.renderPreset || '1080p';
+  const { w: width, h: height } = getResolution(preset);
   const introSec = getIntroGraphicSec(template.id, fps);
 
   const scenes =
@@ -174,6 +180,7 @@ export function buildRemotionProps(project) {
       trimStart: s.trimStart || 0,
       trimEnd: s.trimEnd || 0,
       playbackRate: s.playbackRate || 1,
+      sourceDurationSec: s.sourceDurationSec ?? s.media?.duration,
       loop: Boolean(s.loop),
       audioVolume: s.audioVolume || 0,
       transition: s.transition || transitions[i % transitions.length],
@@ -219,8 +226,8 @@ export function buildRemotionProps(project) {
         ? undefined
         : project.narration?.combinedPath || undefined,
     fps: 30,
-    width: 1920,
-    height: 1080,
+    width,
+    height,
   };
 }
 
@@ -244,9 +251,13 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
       : {},
   );
 
+  const timedScenes = isWalkthrough
+    ? scenes
+    : await prepareRemotionScenes(scenes, publicDir);
+
   const renderProps = {
     ...props,
-    ...(isWalkthrough ? { screens: scenes } : { scenes }),
+    ...(isWalkthrough ? { screens: timedScenes } : { scenes: timedScenes }),
     narrationAudioSrc: extras.narration || props.narrationAudioSrc,
   };
 
@@ -281,6 +292,7 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
       inputProps: renderProps,
       cancelSignal,
       chromiumOptions: { disableWebSecurity: true },
+      timeoutInMilliseconds: Number(process.env.REMOTION_RENDER_TIMEOUT_MS) || 300_000,
       onProgress: ({ progress }) => {
         const pct = Math.floor(progress * 100);
         if (pct >= lastRemotionPct + 10 || pct === 100) {

@@ -12,6 +12,7 @@ import {
   balanceSectionDurations,
   syncSectionsToVideoTimeline,
 } from '../utils/sectionTiming.js';
+import { readSourceDurationSec, syncSceneVideoTiming } from '../utils/sceneClipTiming.js';
 
 const COLOR_GRADES = ['warm_golden', 'cool_blue', 'cinematic_teal_orange', 'warm_contrast'];
 
@@ -130,19 +131,57 @@ function pickFallbackClip(pool, usedKeys, fallbackIndex) {
   };
 }
 
+function presentationToTimelineTransition(presentation) {
+  const map = {
+    fade: 'fade',
+    slide: 'slide',
+    wipe: 'wipe',
+    flip: 'flip',
+    clock: 'clock',
+    dissolve: 'crossfade',
+    ripple: 'wipe',
+    none: 'none',
+    crossfade: 'crossfade',
+    zoom: 'zoom',
+  };
+  return map[presentation] || 'crossfade';
+}
+
 function transitionListForTemplate(visualTheme) {
+  const seq = visualTheme?.transitions?.sequence;
+  if (Array.isArray(seq) && seq.length) {
+    return seq.map(presentationToTimelineTransition);
+  }
+
   const t =
     visualTheme?.transitions?.presentation ||
     visualTheme?.transitions?.defaultType ||
     'crossfade';
-  if (t === 'wipe' || t === 'smash_cut') return ['wipe', 'wipe', 'crossfade', 'slide'];
-  if (t === 'fade') return ['fade', 'fade', 'crossfade', 'fade'];
-  return ['crossfade', 'crossfade', 'wipe', 'slide'];
+  if (t === 'wipe') return ['wipe', 'slide', 'flip', 'wipe', 'crossfade'];
+  if (t === 'flip') return ['flip', 'wipe', 'slide', 'crossfade', 'clock'];
+  if (t === 'clock') return ['clock', 'dissolve', 'fade', 'slide', 'wipe'];
+  if (t === 'dissolve' || t === 'ripple') {
+    return ['crossfade', 'fade', 'dissolve', 'crossfade', 'slide'];
+  }
+  if (t === 'fade') return ['fade', 'crossfade', 'fade', 'slide', 'wipe'];
+  return ['crossfade', 'slide', 'wipe', 'fade', 'flip'];
 }
 
 function maxClipsForTemplate(templateId) {
-  if (templateId === 'template_hype_sports') return 3;
-  if (templateId === 'template_premium_longform') return 1;
+  if (
+    templateId === 'template_hype_sports' ||
+    templateId === 'template_shorts_viral_burst' ||
+    templateId === 'template_shorts_neon_pulse'
+  ) {
+    return 3;
+  }
+  if (
+    templateId === 'template_premium_longform' ||
+    templateId === 'template_shorts_story_mode'
+  ) {
+    return 1;
+  }
+  if (templateId === 'template_epic_cinematic') return 2;
   return 2;
 }
 
@@ -220,7 +259,9 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
       if (!asset) continue;
       const edit = buildClipEdit(asset, Math.max(2.5, clipDuration));
       const atSectionEdge = j === 0 || j === clipCount - 1;
-      scenes.push({
+      const sourceDurationSec = readSourceDurationSec({ media: asset });
+      scenes.push(
+        syncSceneVideoTiming({
         id: `scene-${i}-${j}`,
         sectionId: section.id,
         sectionIndex: i,
@@ -231,6 +272,7 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
         playbackRate: edit.playbackRate,
         loop: edit.loop,
         audioVolume: edit.audioVolume,
+        sourceDurationSec: sourceDurationSec ?? undefined,
         media: asset,
         transition: atSectionEdge ? 'crossfade' : TRANSITIONS[(i + j) % TRANSITIONS.length],
         effect: asset.type === 'image' ? 'ken-burns' : 'none',
@@ -256,16 +298,21 @@ export function buildTimeline(script, mediaManifest, audioTracks, options = {}) 
         chapterBadgeLabel: isFirstSectionScene(j) ? section.title : undefined,
         kenBurnsFrom,
         kenBurnsTo,
-      });
-      timeCursor += edit.duration;
+        }),
+      );
+      timeCursor += scenes[scenes.length - 1].duration;
     }
   }
 
   let contentEnd = Math.max(0, timeCursor - introGraphicSec);
   if (contentEnd < contentTarget * 0.95 && scenes.length > 0) {
     const stretch = contentTarget / Math.max(contentEnd, 1);
-    for (const scene of scenes) {
-      scene.duration = Math.max(2.5, scene.duration * stretch);
+    for (let i = 0; i < scenes.length; i++) {
+      const stretched = Math.max(2.5, scenes[i].duration * stretch);
+      scenes[i] = syncSceneVideoTiming({
+        ...scenes[i],
+        duration: stretched,
+      });
     }
     timeCursor = introGraphicSec;
     for (const scene of scenes) {

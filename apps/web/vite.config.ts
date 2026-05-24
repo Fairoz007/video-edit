@@ -3,7 +3,16 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'strip-crossorigin-for-electron',
+      transformIndexHtml(html) {
+        // Required for Electron file/app protocol; harmless for Vite preview.
+        return html.replace(/\s+crossorigin(="[^"]*")?/g, '');
+      },
+    },
+  ],
   base: './',
   resolve: {
     alias: {

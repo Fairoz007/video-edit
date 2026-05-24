@@ -1,10 +1,8 @@
+import { getApiBase } from './apiBase';
+
 /** Resolve API/static base for exports and cache. */
 export function getAssetBase(): string {
-  const fromEnv = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-  if (fromEnv) return fromEnv;
-  // Vite dev server proxies /api and /exports to the backend
-  if (import.meta.env.DEV) return '';
-  return 'http://127.0.0.1:3847';
+  return getApiBase();
 }
 
 export const ASSET_BASE = getAssetBase();
@@ -31,7 +29,8 @@ export function toExportUrl(outputPath: string): string {
 }
 
 export function toExportUrlDirect(outputPath: string): string {
-  return `http://127.0.0.1:3847/api/exports/play/${encodeURIComponent(exportBasename(outputPath))}`;
+  const base = getAssetBase() || 'http://127.0.0.1:3847';
+  return `${base}/api/exports/play/${encodeURIComponent(exportBasename(outputPath))}`;
 }
 
 export interface MediaAsset {

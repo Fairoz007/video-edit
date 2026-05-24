@@ -13,6 +13,7 @@ export interface ProjectState {
   stage: string;
   message: string;
   outputPath: string | null;
+  outputPaths: string[] | null;
   exportOptions: ExportOptions;
   voiceSettings: { voice: string; rate: number; pitch: number };
   errorMessage: string | null;
@@ -27,6 +28,7 @@ export interface ProjectState {
   setProgress: (progress: number, stage: string, message: string) => void;
   setStatus: (status: ProjectState['status']) => void;
   setOutputPath: (path: string | null) => void;
+  setOutputPaths: (paths: string[] | null) => void;
   setExportOptions: (opts: Partial<ExportOptions>) => void;
   setVoiceSettings: (opts: Partial<{ voice: string; rate: number; pitch: number }>) => void;
   reset: () => void;
@@ -50,7 +52,15 @@ export const useProjectStore = create<ProjectState>((set) => ({
   stage: '',
   message: '',
   outputPath: null,
-  exportOptions: { preset: '1080p', format: 'mp4' },
+  outputPaths: null,
+  exportOptions: {
+    preset: '1080p',
+    format: 'mp4',
+    autoYouTubeShorts: false,
+    exportFullAndShorts: false,
+    shortsTemplateId: 'template_youtube_shorts',
+    shortsMaxDurationSec: 90,
+  },
   voiceSettings: { voice: '', rate: 175, pitch: 0 },
   errorMessage: null,
 
@@ -64,6 +74,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setProgress: (progress, stage, message) => set({ progress, stage, message }),
   setStatus: (status) => set({ status }),
   setOutputPath: (outputPath) => set({ outputPath }),
+  setOutputPaths: (outputPaths) =>
+    set({
+      outputPaths,
+      outputPath: outputPaths?.[0] ?? null,
+    }),
   setExportOptions: (opts) =>
     set((s) => ({ exportOptions: { ...s.exportOptions, ...opts } })),
   setVoiceSettings: (opts) =>
@@ -81,6 +96,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       stage: '',
       message: '',
       outputPath: null,
+      outputPaths: null,
       errorMessage: null,
     }),
 }));

@@ -6,6 +6,7 @@ import {
   DEFAULT_TEMPLATE_ID,
   DOCUMENTARY_VISUAL_TEMPLATES,
 } from '../../constants/documentaryTemplates';
+import { SettingsField, SettingsSection } from '../ui/SettingsSection';
 
 const EDIT_MODES: { id: EditMode; label: string; hint: string }[] = [
   {
@@ -33,90 +34,96 @@ const VIDEO_STYLES: { id: VideoStyle; label: string; hint: string }[] = [
   },
 ];
 
-
 export function DocumentarySettings() {
   const { script, input, setInput, media } = useProjectStore();
   const { rebuildTimelineFlow } = useDocumentaryPipeline();
 
+  const editMode = input.editMode || 'with-narration';
+  const templateId = input.templateId || DEFAULT_TEMPLATE_ID;
+
   return (
-    <section className="p-3 rounded-xl bg-black/30 border border-forge-border/40">
-      <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">
-        <Clapperboard className="w-3.5 h-3.5 text-forge-accent" />
-        Documentary Settings
-      </h3>
-
-      <label className="block text-[10px] text-gray-500 mb-1">Edit mode</label>
-      <select
-        className="input-field text-xs mb-2.5 w-full"
-        value={input.editMode || 'with-narration'}
-        onChange={async (e) => {
-          const editMode = e.target.value as EditMode;
-          setInput({ editMode });
-          if (script && media.length > 0) {
-            await rebuildTimelineFlow({ editMode });
-          }
-        }}
+    <SettingsSection title="Documentary settings" icon={Clapperboard}>
+      <SettingsField
+        label="Edit mode"
+        hint={EDIT_MODES.find((m) => m.id === editMode)?.hint}
       >
-        {EDIT_MODES.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      <p className="text-[9px] text-gray-600 mb-2.5 -mt-1">
-        {EDIT_MODES.find((m) => m.id === (input.editMode || 'with-narration'))?.hint}
-      </p>
+        <select
+          className="input-field text-xs w-full"
+          value={editMode}
+          onChange={async (e) => {
+            const next = e.target.value as EditMode;
+            setInput({ editMode: next });
+            if (script && media.length > 0) {
+              await rebuildTimelineFlow({ editMode: next });
+            }
+          }}
+        >
+          {EDIT_MODES.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </SettingsField>
 
-      <label className="block text-[10px] text-gray-500 mb-1">Composition</label>
-      <select className="input-field text-xs mb-2.5">
-        <option>16:9 Widescreen</option>
-        <option>9:16 Vertical</option>
-        <option>1:1 Square</option>
-      </select>
+      <SettingsField label="Composition">
+        <select className="input-field text-xs w-full">
+          <option>16:9 Widescreen</option>
+          <option>9:16 Vertical</option>
+          <option>1:1 Square</option>
+        </select>
+      </SettingsField>
 
-      <label className="block text-[10px] text-gray-500 mb-1">Style</label>
-      <select
-        className="input-field text-xs mb-2.5 w-full"
-        value={input.videoStyle || 'documentary'}
-        onChange={(e) => setInput({ videoStyle: e.target.value as VideoStyle })}
+      <SettingsField
+        label="Style"
+        hint={VIDEO_STYLES.find((s) => s.id === (input.videoStyle || 'documentary'))?.hint}
       >
-        {VIDEO_STYLES.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.label}
-          </option>
-        ))}
-      </select>
+        <select
+          className="input-field text-xs w-full"
+          value={input.videoStyle || 'documentary'}
+          onChange={(e) => setInput({ videoStyle: e.target.value as VideoStyle })}
+        >
+          {VIDEO_STYLES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </SettingsField>
 
-      <label className="block text-[10px] text-gray-500 mb-1">Visual template</label>
-      <select
-        className="input-field text-xs mb-2.5 w-full"
-        value={input.templateId || DEFAULT_TEMPLATE_ID}
-        disabled={input.videoStyle === 'walkthrough'}
-        onChange={async (e) => {
-          const templateId = e.target.value;
-          setInput({ templateId, videoStyle: 'documentary' });
-          if (script && media.length > 0) {
-            await rebuildTimelineFlow({ templateId, videoStyle: 'documentary' });
-          }
-        }}
+      <SettingsField
+        label="Visual template"
+        hint={
+          DOCUMENTARY_VISUAL_TEMPLATES.find((t) => t.id === templateId)?.description ||
+          'Choose a look in Templates for previews.'
+        }
       >
-        {DOCUMENTARY_VISUAL_TEMPLATES.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-            {t.id === DEFAULT_TEMPLATE_ID ? ' (default)' : ''}
-          </option>
-        ))}
-      </select>
-      <p className="text-[9px] text-gray-600 mb-2.5 -mt-1">
-        {DOCUMENTARY_VISUAL_TEMPLATES.find((t) => t.id === (input.templateId || DEFAULT_TEMPLATE_ID))
-          ?.description || 'Choose a look in Templates sidebar for previews.'}
-      </p>
+        <select
+          className="input-field text-xs w-full"
+          value={templateId}
+          disabled={input.videoStyle === 'walkthrough'}
+          onChange={async (e) => {
+            const next = e.target.value;
+            setInput({ templateId: next, videoStyle: 'documentary' });
+            if (script && media.length > 0) {
+              await rebuildTimelineFlow({ templateId: next, videoStyle: 'documentary' });
+            }
+          }}
+        >
+          {DOCUMENTARY_VISUAL_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+              {t.id === DEFAULT_TEMPLATE_ID ? ' (default)' : ''}
+            </option>
+          ))}
+        </select>
+      </SettingsField>
 
       {script && (
-        <p className="mt-2.5 text-[10px] text-forge-cyan/70 pt-2 border-t border-forge-border/30">
+        <p className="text-xs text-forge-cyan/80 pt-2 border-t border-forge-border/40 font-medium">
           {script.sections.length} sections · {script.fullNarration.split(' ').length} words
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }

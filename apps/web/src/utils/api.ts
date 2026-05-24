@@ -1,9 +1,8 @@
 import axios from 'axios';
+import { getApiBase } from './apiBase';
 
-/** In Vite dev, use same-origin `/api` (proxied to backend). Electron/production use explicit URL. */
-const BASE =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? '' : 'http://127.0.0.1:3847');
+/** In Vite dev, use same-origin `/api` (proxied). Packaged Electron loads UI from backend (same origin). */
+const BASE = getApiBase();
 
 export const api = axios.create({
   baseURL: `${BASE}/api`,
@@ -165,6 +164,14 @@ export interface DocumentaryInput {
 export interface ExportOptions {
   preset?: '1080p' | '4k' | 'youtube' | 'shorts' | 'reels';
   format?: 'mp4' | 'mov';
+  /** Render 9:16 and split into ≤90s parts for YouTube Shorts. */
+  autoYouTubeShorts?: boolean;
+  /** Render full documentary and Shorts in one job (16:9 + split 9:16 parts). */
+  exportFullAndShorts?: boolean;
+  /** Visual template id for Shorts render (separate from main documentary template). */
+  shortsTemplateId?: string;
+  /** Max seconds per Short part (YouTube limit is 90). */
+  shortsMaxDurationSec?: number;
   musicPath?: string;
   voice?: string;
   rate?: number;

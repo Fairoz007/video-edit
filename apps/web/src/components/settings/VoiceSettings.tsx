@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, Loader2, RefreshCw, Play } from 'lucide-react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
+import { formatBackendUnreachableMessage } from '../../utils/apiBase';
 import { healthCheck, listVoices, previewVoice } from '../../utils/api';
 import { useProjectStore } from '../../hooks/useProjectStore';
+import { SettingsField, SettingsSection } from '../ui/SettingsSection';
 
 function formatVoiceError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
-      return 'Backend not reachable. Run npm run dev:backend.';
+      return formatBackendUnreachableMessage();
     }
     const msg = err.response?.data?.error;
     if (typeof msg === 'string') return msg;
@@ -124,31 +126,25 @@ export function VoiceSettings() {
 
   const selectedVoice = voices.find((v) => v.id === voiceSettings.voice);
   const canPreview = Boolean(
-    selectedVoice?.previewUrl ||
-      selectedVoice?.id.startsWith('elevenlabs:'),
+    selectedVoice?.previewUrl || selectedVoice?.id.startsWith('elevenlabs:'),
   );
 
   return (
-    <section className="p-3 rounded-xl bg-black/30 border border-forge-border/40">
-      <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-3">
-        <Mic className="w-3.5 h-3.5 text-forge-accent" />
-        Voice & Narration
-      </h3>
-
+    <SettingsSection title="Voice & narration" icon={Mic}>
       {loading && (
-        <p className="flex items-center gap-2 text-[10px] text-gray-500">
-          <Loader2 className="w-3 h-3 animate-spin" />
+        <p className="flex items-center gap-2 text-xs text-forge-muted">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
           Loading voices…
         </p>
       )}
 
       {error && (
         <motion.div className="mb-2">
-          <p className="text-[10px] text-red-400 mb-2">{error}</p>
+          <p className="text-xs text-red-400 mb-2">{error}</p>
           <button
             type="button"
             onClick={() => loadVoices()}
-            className="text-[10px] text-forge-accent flex items-center gap-1"
+            className="text-xs text-forge-glow flex items-center gap-1 hover:underline"
           >
             <RefreshCw className="w-3 h-3" />
             Retry
@@ -158,79 +154,73 @@ export function VoiceSettings() {
 
       {!loading && !error && (
         <>
-          <label className="block text-[10px] text-gray-500 mb-1">AI Voice</label>
-          <select
-            className="input-field text-xs mb-2.5 w-full"
-            value={voiceSettings.voice || voices[0]?.id || ''}
-            onChange={(e) => setVoiceSettings({ voice: e.target.value })}
-            disabled={!voices.length}
-          >
-            {voices.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.label}
-              </option>
-            ))}
-          </select>
+          <SettingsField label="AI voice">
+            <select
+              className="input-field text-xs w-full"
+              value={voiceSettings.voice || voices[0]?.id || ''}
+              onChange={(e) => setVoiceSettings({ voice: e.target.value })}
+              disabled={!voices.length}
+            >
+              {voices.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
 
-          <label className="block text-[10px] text-gray-500 mb-1">
-            Speed ({voiceSettings.rate} WPM)
-          </label>
-          <input
-            type="range"
-            min={120}
-            max={220}
-            value={voiceSettings.rate}
-            onChange={(e) => setVoiceSettings({ rate: Number(e.target.value) })}
-            className="neon-slider mb-2.5"
-          />
+          <SettingsField label={`Speed · ${voiceSettings.rate} WPM`}>
+            <input
+              type="range"
+              min={120}
+              max={220}
+              value={voiceSettings.rate}
+              onChange={(e) => setVoiceSettings({ rate: Number(e.target.value) })}
+              className="neon-slider"
+            />
+          </SettingsField>
 
-          <label className="block text-[10px] text-gray-500 mb-1">
-            Pitch ({voiceSettings.pitch > 0 ? '+' : ''}
-            {voiceSettings.pitch})
-          </label>
-          <input
-            type="range"
-            min={-12}
-            max={12}
-            value={voiceSettings.pitch}
-            onChange={(e) => setVoiceSettings({ pitch: Number(e.target.value) })}
-            className="neon-slider mb-2.5"
-          />
+          <SettingsField label={`Pitch · ${voiceSettings.pitch > 0 ? '+' : ''}${voiceSettings.pitch}`}>
+            <input
+              type="range"
+              min={-12}
+              max={12}
+              value={voiceSettings.pitch}
+              onChange={(e) => setVoiceSettings({ pitch: Number(e.target.value) })}
+              className="neon-slider"
+            />
+          </SettingsField>
 
-          {previewError && (
-            <p className="text-[10px] text-red-400 mb-2">{previewError}</p>
-          )}
+          {previewError && <p className="text-xs text-red-400">{previewError}</p>}
 
           {canPreview ? (
             <button
               type="button"
               onClick={handlePreview}
               disabled={!voices.length}
-              className="w-full py-1.5 rounded-lg border border-forge-border/50 text-[10px] font-medium text-gray-400 hover:text-white hover:border-forge-accent/40 flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+              className="w-full py-2.5 rounded-studio-lg border border-forge-border-strong text-xs font-semibold text-forge-text-secondary hover:text-forge-text hover:border-forge-border-accent hover:shadow-glow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40"
             >
               {previewing ? (
                 <>
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Playing…
                 </>
               ) : (
                 <>
-                  <Play className="w-3 h-3" />
-                  Preview Voice
+                  <Play className="w-3.5 h-3.5" />
+                  Preview voice
                 </>
               )}
             </button>
           ) : (
-            <p className="text-[9px] text-gray-600">
-              Voice preview uses ElevenLabs sample audio (local Chatterbox preview disabled).
+            <p className="settings-hint">
+              Voice preview uses ElevenLabs sample audio when available.
             </p>
           )}
 
-          <p className="text-[9px] text-gray-600 mt-2">
-            {ttsDevice ? `TTS device: ${ttsDevice}` : 'ElevenLabs + Chatterbox'}
-          </p>
+          <p className="settings-hint">{ttsDevice ? `TTS: ${ttsDevice}` : 'ElevenLabs + Chatterbox'}</p>
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }

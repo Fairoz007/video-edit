@@ -4,6 +4,7 @@
 import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,11 +16,12 @@ import { createQueueRouter } from './routes/queue.js';
 import { createScrapeRouter } from './routes/scrape.js';
 import { createExportsRouter } from './routes/exports.js';
 import { initFfmpeg } from './utils/ffmpegPath.js';
-import { getRepoRoot } from '@docuforge/config/repoRoot';
+import { getDataRoot, getRepoRoot } from '@docuforge/config/repoRoot';
 import { resolvePython } from './utils/resolvePython.js';
 import { prewarmChatterboxWorker } from './services/chatterboxBridge.js';
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
+const DATA_ROOT = getDataRoot(path.dirname(fileURLToPath(import.meta.url)));
 
 function resolveScriptProviderLabel() {
   const mode = (process.env.SCRIPT_PROVIDER || 'auto').toLowerCase();
@@ -48,7 +50,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(
   '/exports',
-  express.static(path.join(ROOT, 'exports'), {
+  express.static(path.join(DATA_ROOT, 'exports'), {
     setHeaders(res, filePath) {
       if (filePath.endsWith('.mp4')) {
         res.setHeader('Content-Type', 'video/mp4');
@@ -57,17 +59,32 @@ app.use(
     },
   }),
 );
-app.use('/cache', express.static(path.join(ROOT, 'cache')));
+app.use('/cache', express.static(path.join(DATA_ROOT, 'cache')));
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'docuforge-backend' }));
 
-app.use('/api/projects', createProjectRouter(ROOT));
-app.use('/api/media', createMediaRouter(ROOT));
-app.use('/api/pipeline', createPipelineRouter(ROOT));
-app.use('/api/render', createRenderRouter(ROOT));
-app.use('/api/queue', createQueueRouter(ROOT));
-app.use('/api/scrape', createScrapeRouter(ROOT));
-app.use('/api/exports', createExportsRouter(ROOT));
+app.use('/api/projects', createProjectRouter(DATA_ROOT));
+app.use('/api/media', createMediaRouter(DATA_ROOT));
+app.use('/api/pipeline', createPipelineRouter(DATA_ROOT));
+app.use('/api/render', createRenderRouter(DATA_ROOT));
+app.use('/api/queue', createQueueRouter(DATA_ROOT));
+app.use('/api/scrape', createScrapeRouter(DATA_ROOT));
+app.use('/api/exports', createExportsRouter(DATA_ROOT));
+
+/** Electron production: serve Vite build from same origin as API (avoids app:// CORS issues). */
+function mountPackagedUi() {
+  if (process.env.DOCUFORGE_SERVE_UI !== '1') return;
+  const webDist = path.join(ROOT, 'apps', 'web', 'dist');
+  const indexHtml = path.join(webDist, 'index.html');
+  if (!fs.existsSync(indexHtml)) {
+    console.warn('[DocuForge] Packaged UI missing:', indexHtml);
+    return;
+  }
+  console.log('[DocuForge] Serving desktop UI from', webDist);
+  app.use(express.static(webDist));
+}
+
+mountPackagedUi();
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   const providers = [

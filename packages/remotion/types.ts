@@ -14,6 +14,7 @@ export interface Scene {
   duration: number;
   trimStart?: number;
   trimEnd?: number;
+  sourceDurationSec?: number;
   playbackRate?: number;
   loop?: boolean;
   audioVolume?: number;

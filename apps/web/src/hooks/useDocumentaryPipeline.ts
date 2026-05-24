@@ -12,6 +12,7 @@ import {
   restartRender,
   startRender,
 } from '../utils/api';
+import { formatBackendUnreachableMessage } from '../utils/apiBase';
 import { normalizeMediaList } from '../utils/mediaUrl';
 import { isValidHttpUrl, normalizeHttpUrlInput } from '../utils/urls';
 import { useProjectStore } from './useProjectStore';
@@ -34,7 +35,7 @@ function formatApiError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const msg = err.response?.data?.error;
     if (typeof msg === 'string') return msg;
-    if (err.code === 'ERR_NETWORK') return 'Backend not reachable. Run npm run dev:backend.';
+    if (err.code === 'ERR_NETWORK') return formatBackendUnreachableMessage();
   }
   return err instanceof Error ? err.message : 'Something went wrong';
 }
@@ -81,7 +82,11 @@ export function useDocumentaryPipeline() {
       if (Array.isArray(project.media)) store.setMedia(normalizeMediaList(project.media));
       if (project.timeline) store.setTimeline(project.timeline as typeof store.timeline);
       if (typeof project.id === 'string') store.setProjectId(project.id);
-      if (typeof project.outputPath === 'string') store.setOutputPath(project.outputPath);
+      if (Array.isArray(project.outputPaths) && project.outputPaths.length) {
+        store.setOutputPaths(project.outputPaths as string[]);
+      } else if (typeof project.outputPath === 'string') {
+        store.setOutputPath(project.outputPath);
+      }
       if (typeof project.progress === 'number') {
         store.setProgress(
           project.progress,

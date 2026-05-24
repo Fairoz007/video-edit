@@ -73,6 +73,23 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
 
   const showLowerThird = Boolean(scene.lowerThird?.name || scene.sectionTitle);
 
+  const trimStartSec = Math.max(0, Number(scene.trimStart) || 0);
+  const trimEndSec = Math.max(0, Number(scene.trimEnd) || 0);
+  const sourceSec = Number(scene.sourceDurationSec);
+  const playableSec =
+    Number.isFinite(sourceSec) && sourceSec > 0
+      ? Math.max(0.1, sourceSec - trimStartSec - trimEndSec)
+      : null;
+  const trimBeforeFrames = Math.round(trimStartSec * fps);
+  const trimAfterFrames =
+    playableSec != null ? Math.max(trimBeforeFrames + 1, Math.round((trimStartSec + playableSec) * fps)) : undefined;
+  const playbackRate = scene.playbackRate || 1;
+  const timelineSec = durationFrames / fps;
+  const needsLoop =
+    Boolean(scene.loop) ||
+    (playableSec != null && timelineSec > playableSec / playbackRate + 0.08);
+  const videoTimeoutMs = 120_000;
+
   return (
     <AbsoluteFill style={{ backgroundColor: theme.palette.background }}>
       {theme.filmGrain > 0 && (
@@ -91,11 +108,13 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
           src={src}
           objectFit="cover"
           style={mediaStyle}
-          trimBefore={Math.max(0, Math.round((scene.trimStart || 0) * fps))}
-          playbackRate={scene.playbackRate || 1}
-          loop={scene.loop}
+          trimBefore={trimBeforeFrames}
+          trimAfter={trimAfterFrames}
+          playbackRate={playbackRate}
+          loop={needsLoop}
           volume={scene.audioVolume || 0}
           muted={(scene.audioVolume || 0) <= 0}
+          delayRenderTimeoutInMilliseconds={videoTimeoutMs}
         />
       ) : (
         <Img src={src} style={imageStyle} />

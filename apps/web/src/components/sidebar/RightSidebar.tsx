@@ -37,8 +37,7 @@ export function RightSidebar({ overlay }: Props) {
     setMobilePanel,
     toggleRightPanel,
     setActiveRightPanel,
-  } =
-    useUiStore();
+  } = useUiStore();
   const bp = useBreakpoint();
 
   const showPanel = overlay ? mobilePanel === 'right' : rightPanelOpen;
@@ -51,12 +50,12 @@ export function RightSidebar({ overlay }: Props) {
   if (!showPanel && !overlay) {
     return (
       <motion.nav
-        className="hidden xl:flex flex-col items-center py-3 pr-3 gap-1 shrink-0"
+        className="hidden xl:flex flex-col items-center py-2 pr-2 gap-1 shrink-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        <button type="button" onClick={toggleRightPanel} className="glass-nav btn-icon p-2.5" title="Inspector">
-          <ChevronRight className="w-4 h-4" />
+        <button type="button" onClick={toggleRightPanel} className="glass-nav btn-icon p-2.5 mb-1" title="Inspector">
+          <ChevronRight className="w-4 h-4 text-forge-glow" />
         </button>
         {TABS.map(({ id, icon: Icon, label }) => (
           <button
@@ -81,28 +80,28 @@ export function RightSidebar({ overlay }: Props) {
   }
 
   const panel = (
-    <div className="studio-panel flex flex-col flex-1 min-h-0 overflow-hidden h-full">
-      <div className="flex border-b border-forge-border px-2 py-2 gap-1 shrink-0">
+    <div className="glass-panel-elevated flex flex-col flex-1 min-h-0 overflow-hidden h-full">
+      <div className="panel-header shrink-0 py-2 gap-2">
         {overlay && (
-          <button type="button" onClick={closeMobilePanels} className="btn-icon p-2 lg:hidden">
+          <button type="button" onClick={closeMobilePanels} className="btn-icon p-2 lg:hidden -ml-1">
             <X className="w-4 h-4" />
           </button>
         )}
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => selectTab(id)}
-            className={`flex-1 min-w-[64px] flex items-center justify-center gap-1.5 py-2 px-2 rounded-studio transition-all text-[10px] font-semibold uppercase tracking-wide ${
-              activeRightPanel === id
-                ? 'bg-white/[0.08] text-forge-text border border-forge-border-strong'
-                : 'text-forge-muted hover:text-forge-text-secondary hover:bg-white/[0.04] border border-transparent'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="hidden 2xl:inline">{label}</span>
-          </button>
-        ))}
+        <div className="flex flex-1 gap-1 p-1 rounded-studio-lg bg-black/30 border border-forge-border/50">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => selectTab(id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg transition-all text-[9px] font-bold uppercase tracking-wider ${
+                activeRightPanel === id ? 'nav-item-active' : 'text-forge-muted hover:text-forge-text-secondary'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="hidden 2xl:block">{label}</span>
+            </button>
+          ))}
+        </div>
         {!overlay && (
           <button type="button" onClick={toggleRightPanel} className="btn-icon shrink-0" title="Collapse">
             <ChevronRight className="w-4 h-4" />
@@ -115,7 +114,7 @@ export function RightSidebar({ overlay }: Props) {
           {activeRightPanel === 'settings' && (
             <motion.div
               key="settings"
-              initial={{ opacity: 0, x: 6 }}
+              initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               className="space-y-4"
@@ -144,12 +143,12 @@ export function RightSidebar({ overlay }: Props) {
         </AnimatePresence>
       </div>
 
-      <motion.div className="p-4 border-t border-forge-border shrink-0 bg-forge-surface/50 space-y-2">
+      <motion.div className="p-4 border-t border-forge-border/60 shrink-0 space-y-2.5 bg-gradient-to-t from-black/40 to-transparent">
         {isRendering ? (
           <motion.button
             type="button"
             onClick={() => cancelRenderFlow()}
-            className="w-full py-3 rounded-studio border border-red-500/40 text-red-300 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-red-500/10"
+            className="w-full py-3.5 rounded-studio-lg border border-red-500/40 text-red-300 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
           >
@@ -159,7 +158,7 @@ export function RightSidebar({ overlay }: Props) {
           <motion.button
             type="button"
             onClick={() => startRenderFlow()}
-            className="w-full py-3 rounded-studio accent-gradient font-semibold text-sm flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-studio-lg btn-primary-glow font-semibold text-sm flex items-center justify-center gap-2"
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
           >
@@ -167,9 +166,16 @@ export function RightSidebar({ overlay }: Props) {
             Render documentary
           </motion.button>
         )}
-        <p className="text-[10px] text-center text-forge-muted mt-2">
-          {videoOnly ? 'Video only' : `${voiceSettings.rate} WPM`} | {input.videoStyle || 'documentary'} |{' '}
-          {exportOptions.preset}
+        <p className="text-[10px] text-center text-forge-muted leading-relaxed">
+          {videoOnly ? 'Video only' : `${voiceSettings.rate} WPM`}
+          {' · '}
+          {input.videoStyle || 'documentary'}
+          {' · '}
+          {exportOptions.exportFullAndShorts
+            ? `full + shorts · ${exportOptions.preset}`
+            : exportOptions.autoYouTubeShorts
+              ? `shorts ≤${exportOptions.shortsMaxDurationSec ?? 90}s`
+              : exportOptions.preset}
         </p>
       </motion.div>
     </div>
@@ -184,7 +190,7 @@ export function RightSidebar({ overlay }: Props) {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="absolute right-0 top-0 bottom-0 z-40 w-[min(100%,300px)] py-3 pr-3 pl-1 flex flex-col"
+            className="absolute right-0 top-0 bottom-0 z-40 w-[min(100%,320px)] py-2 pr-2 pl-1 flex flex-col"
           >
             {panel}
           </motion.aside>
@@ -195,7 +201,7 @@ export function RightSidebar({ overlay }: Props) {
 
   return (
     <motion.aside
-      className="hidden xl:flex w-[272px] shrink-0 flex-col py-3 pr-3 min-h-0"
+      className="hidden xl:flex w-[300px] shrink-0 flex-col py-2 pr-2 min-h-0"
       initial={{ x: 12, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
     >
@@ -210,13 +216,15 @@ export function RightSidebarCompact() {
   if (bp !== 'tablet') return null;
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => setMobilePanel(mobilePanel === 'right' ? 'none' : 'right')}
-      className="fixed right-4 bottom-28 z-20 p-3 rounded-full accent-gradient shadow-card"
+      className="fixed right-4 bottom-28 z-20 p-3.5 rounded-full btn-primary-glow shadow-neon"
       title="Inspector"
+      whileHover={{ scale: 1.06 }}
+      whileTap={{ scale: 0.95 }}
     >
       <Settings className="w-5 h-5 text-white" />
-    </button>
+    </motion.button>
   );
 }

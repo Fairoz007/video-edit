@@ -1,62 +1,251 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  shell,
+  protocol,
+  net,
+  Menu,
+} from 'electron';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { fork, ChildProcess } from 'child_process';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
+import { loadAppEnv } from './loadAppEnv.js';
+import {
+  applyPackagedRuntimeEnv,
+  readDocuForgeSetupStatus,
+  runDocuForgeSetup,
+  shouldPromptDocuForgeSetup,
+  skipDocuForgeSetup,
+} from './docuforgeSetup.js';
+import {
+  getDataRoot,
+  getInstallRoot,
+  getServerScriptPath,
+  getWebDistDir,
+} from './paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** file:// + Vite `crossorigin` modules fail silently — serve UI over app:// */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+app.setName('DocuForge');
 
 const isDev = process.env.NODE_ENV === 'development';
 let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess | null = null;
 
-const ROOT = process.env.DOCUFORGE_ROOT
-  ? path.resolve(process.env.DOCUFORGE_ROOT)
-  : path.join(__dirname, '../../..');
-const PROJECTS_DIR = path.join(ROOT, 'projects');
-const CACHE_DIR = path.join(ROOT, 'cache');
-const EXPORTS_DIR = path.join(ROOT, 'exports');
+let installRoot = '';
+let dataRoot = '';
+let projectsDir = '';
+let cacheDir = '';
+let exportsDir = '';
+
+function initRoots() {
+  const roots = loadAppEnv();
+  installRoot = roots.installRoot;
+  dataRoot = roots.dataRoot;
+  projectsDir = path.join(dataRoot, 'projects');
+  cacheDir = path.join(dataRoot, 'cache');
+  exportsDir = path.join(dataRoot, 'exports');
+  if (app.isPackaged) {
+    applyPackagedRuntimeEnv(dataRoot);
+  }
+}
 
 function ensureDirs() {
-  for (const dir of [PROJECTS_DIR, CACHE_DIR, EXPORTS_DIR]) {
+  for (const dir of [projectsDir, cacheDir, exportsDir]) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+function registerAppProtocol() {
+  const webDist = getWebDistDir(installRoot);
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url);
+    const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
+    const filePath = path.join(webDist, relative);
+    if (!filePath.startsWith(webDist)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+    if (!fs.existsSync(filePath)) {
+      console.error('[DocuForge] Missing UI asset:', filePath);
+      return new Response('Not found', { status: 404 });
+    }
+    return net.fetch(pathToFileURL(filePath).href);
+  });
 }
 
 const BACKEND_PORT = process.env.BACKEND_PORT || '3847';
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 
-function startBackend() {
-  const serverPath = path.join(ROOT, 'apps', 'api', 'server.js');
-  if (!fs.existsSync(serverPath)) return;
-  backendProcess = fork(serverPath, [], {
-    env: { ...process.env, DOCUFORGE_ROOT: ROOT, BACKEND_PORT },
-    stdio: 'inherit',
-  });
+let backendReady = false;
+let backendLastError = '';
+let usedBackendUrl = false;
+
+function getBackendLogPath(): string {
+  return path.join(dataRoot || getDataRoot(), 'logs', 'backend.log');
 }
 
-async function waitForBackend(maxAttempts = 40, intervalMs = 250): Promise<boolean> {
+function appendBackendLog(line: string) {
+  try {
+    const logPath = getBackendLogPath();
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, `${line}\n`);
+  } catch {
+    /* ignore log write errors */
+  }
+}
+
+function startBackend(): boolean {
+  const root = installRoot || getInstallRoot();
+  const serverPath = path.resolve(getServerScriptPath(root));
+  if (!fs.existsSync(serverPath)) {
+    backendLastError = `Backend not found: ${serverPath}`;
+    console.error('[DocuForge]', backendLastError);
+    appendBackendLog(backendLastError);
+    return false;
+  }
+
+  console.log('[DocuForge] Starting backend:', serverPath);
+  appendBackendLog(`[${new Date().toISOString()}] Starting ${serverPath}`);
+
+  backendProcess = spawn(process.execPath, [serverPath], {
+    cwd: root,
+    env: {
+      ...process.env,
+      DOCUFORGE_ROOT: root,
+      DOCUFORGE_DATA: dataRoot || getDataRoot(),
+      DOCUFORGE_SERVE_UI: '1',
+      BACKEND_PORT,
+      ELECTRON_RUN_AS_NODE: '1',
+      PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+
+  const logOutput = (chunk: Buffer) => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    for (const line of text.split(/\r?\n/)) {
+      if (line.trim()) appendBackendLog(line);
+    }
+  };
+
+  backendProcess.stdout?.on('data', logOutput);
+  backendProcess.stderr?.on('data', logOutput);
+
+  backendProcess.on('error', (err) => {
+    backendLastError = err.message;
+    console.error('[DocuForge] Backend process error:', err);
+    appendBackendLog(`Process error: ${err.message}`);
+  });
+
+  backendProcess.on('exit', (code, signal) => {
+    backendReady = false;
+    const msg = `Backend exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`;
+    console.error('[DocuForge]', msg);
+    appendBackendLog(msg);
+    if (code !== 0 && code !== null) {
+      backendLastError = `Backend crashed (exit ${code}). See ${getBackendLogPath()}`;
+    }
+  });
+
+  return true;
+}
+
+async function waitForBackend(maxAttempts = 90, intervalMs = 500): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const res = await fetch(`${BACKEND_URL}/health`);
-      if (res.ok) return true;
+      if (res.ok) {
+        backendReady = true;
+        return true;
+      }
     } catch {
       // backend still starting
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   console.warn('[DocuForge] Backend did not respond on', BACKEND_URL);
+  backendReady = false;
   return false;
 }
 
+async function showBackendErrorDialog() {
+  const logPath = getBackendLogPath();
+  const detail = backendLastError || 'The API server did not start.';
+  const opts = {
+    type: 'error' as const,
+    title: 'DocuForge — Backend not running',
+    message: 'DocuForge could not start its backend.',
+    detail: `${detail}\n\nLog file:\n${logPath}\n\nThe app will stay open but features need the backend. Port ${BACKEND_PORT} must be free.`,
+  };
+  if (mainWindow) {
+    await dialog.showMessageBox(mainWindow, opts);
+  } else {
+    await dialog.showMessageBox(opts);
+  }
+}
+
+function loadProductionUi(preferBackend: boolean) {
+  if (!mainWindow || isDev) return;
+
+  const webDist = getWebDistDir(installRoot);
+  const indexHtml = path.join(webDist, 'index.html');
+  const hasBundledUi = fs.existsSync(indexHtml);
+
+  if (preferBackend && backendReady) {
+    console.log('[DocuForge] Loading UI from', BACKEND_URL);
+    usedBackendUrl = true;
+    mainWindow.loadURL(`${BACKEND_URL}/`);
+    return;
+  }
+
+  usedBackendUrl = false;
+  if (hasBundledUi) {
+    console.log('[DocuForge] Loading bundled UI (app://)');
+    mainWindow.loadURL('app://local/index.html');
+    return;
+  }
+
+  console.error('[DocuForge] UI build missing:', indexHtml);
+  if (backendReady) {
+    usedBackendUrl = true;
+    mainWindow.loadURL(`${BACKEND_URL}/`);
+  }
+}
+
 function createWindow() {
+  if (!isDev) {
+    Menu.setApplicationMenu(null);
+  }
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1200,
     minHeight: 720,
+    title: 'DocuForge',
+    show: true,
     backgroundColor: '#0a0a0f',
-    titleBarStyle: 'hiddenInset',
+    autoHideMenuBar: true,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -64,11 +253,25 @@ function createWindow() {
     },
   });
 
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('[DocuForge] Page load failed:', code, desc, url);
+    if (!isDev && usedBackendUrl && mainWindow) {
+      usedBackendUrl = false;
+      loadProductionUi(false);
+    }
+  });
+
+  mainWindow.webContents.on('console-message', (_e, _level, message) => {
+    if (message.includes('Error') || message.includes('error')) {
+      console.error('[DocuForge UI]', message);
+    }
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(ROOT, 'apps', 'web', 'dist', 'index.html'));
+    loadProductionUi(false);
   }
 
   mainWindow.on('closed', () => {
@@ -76,17 +279,44 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(async () => {
-  ensureDirs();
+async function bootstrapBackend() {
   const alreadyUp = await waitForBackend(4, 200);
   if (!alreadyUp) {
-    startBackend();
-    await waitForBackend();
+    const started = startBackend();
+    if (started) {
+      const ok = await waitForBackend(60, 500);
+      if (!ok) {
+        await showBackendErrorDialog();
+        return;
+      }
+    } else {
+      await showBackendErrorDialog();
+      return;
+    }
+  } else {
+    backendReady = true;
   }
+
+  if (!mainWindow || isDev) return;
+  loadProductionUi(true);
+}
+
+app.whenReady().then(() => {
+  initRoots();
+  ensureDirs();
+
+  if (!isDev) {
+    registerAppProtocol();
+  }
+
   createWindow();
+  void bootstrapBackend();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      void bootstrapBackend();
+    }
   });
 });
 
@@ -95,12 +325,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC: paths & filesystem
 ipcMain.handle('get-paths', () => ({
-  root: ROOT,
-  projects: PROJECTS_DIR,
-  cache: CACHE_DIR,
-  exports: EXPORTS_DIR,
+  root: installRoot,
+  data: dataRoot,
+  projects: projectsDir,
+  cache: cacheDir,
+  exports: exportsDir,
 }));
 
 ipcMain.handle('select-export-folder', async () => {
@@ -116,4 +346,63 @@ ipcMain.handle('open-path', async (_e, filePath: string) => {
 
 ipcMain.handle('show-item-in-folder', async (_e, filePath: string) => {
   shell.showItemInFolder(filePath);
+});
+
+ipcMain.handle('get-app-info', () => ({
+  isPackaged: app.isPackaged,
+  version: app.getVersion(),
+  name: app.getName(),
+}));
+
+ipcMain.handle('docuforge-setup-status', () =>
+  readDocuForgeSetupStatus(installRoot, dataRoot),
+);
+
+ipcMain.handle('docuforge-setup-should-prompt', () =>
+  shouldPromptDocuForgeSetup(installRoot, dataRoot),
+);
+
+ipcMain.handle('docuforge-setup-skip', () => {
+  skipDocuForgeSetup(dataRoot);
+  return { ok: true };
+});
+
+ipcMain.handle('docuforge-run-setup', async (event) => {
+  const sender = event.sender;
+  return runDocuForgeSetup(installRoot, dataRoot, (line) => {
+    if (!sender.isDestroyed()) {
+      sender.send('docuforge-setup-log', line);
+    }
+  });
+});
+
+ipcMain.handle('docuforge-setup-refresh-python', () => {
+  const status = readDocuForgeSetupStatus(installRoot, dataRoot);
+  return { pythonFound: status.pythonFound, pythonPath: status.pythonPath };
+});
+
+/** @deprecated — use docuforge-* IPC */
+ipcMain.handle('chatterbox-setup-status', () =>
+  readDocuForgeSetupStatus(installRoot, dataRoot),
+);
+ipcMain.handle('chatterbox-setup-should-prompt', () =>
+  shouldPromptDocuForgeSetup(installRoot, dataRoot),
+);
+ipcMain.handle('chatterbox-setup-skip', () => {
+  skipDocuForgeSetup(dataRoot);
+  return { ok: true };
+});
+ipcMain.handle('chatterbox-run-setup', async (event) => {
+  const sender = event.sender;
+  return runDocuForgeSetup(installRoot, dataRoot, (line) => {
+    if (!sender.isDestroyed()) {
+      sender.send('chatterbox-setup-log', line);
+    }
+  });
+});
+
+ipcMain.handle('open-external-url', async (_e, url: string) => {
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    await shell.openExternal(url);
+  }
 });

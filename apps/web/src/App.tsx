@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { EditorLayout } from './components/layout/EditorLayout';
+import { StatusFooter } from './components/layout/StatusFooter';
 import { TopToolbar } from './components/layout/TopToolbar';
+import { ChatterboxSetupDialog } from './components/setup/ChatterboxSetupDialog';
 
 export default function App() {
   return (
@@ -10,6 +12,9 @@ export default function App() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
     >
+      <div className="ambient-orb-purple" aria-hidden />
+      <div className="ambient-orb-blue" aria-hidden />
+
       <TopToolbar />
       <motion.main
         className="flex-1 overflow-hidden relative z-10 min-h-0"
@@ -19,6 +24,8 @@ export default function App() {
       >
         <EditorLayout />
       </motion.main>
+      <StatusFooter />
+      <ChatterboxSetupDialog />
     </motion.div>
   );
 }

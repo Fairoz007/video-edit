@@ -51,6 +51,7 @@ export const DOCUMENTARY_TEMPLATES = [
   {
     id: DEFAULT_TEMPLATE_ID,
     name: 'Cinematic DocuForge',
+    format: 'longform',
     description:
       'Purple-to-pink gradient accents, kinetic word-by-word subtitles, cross-dissolve chapters. The standard DocuForge look.',
     style: 'cinematic_dark',
@@ -187,19 +188,18 @@ export const DOCUMENTARY_TEMPLATES = [
     transitions: {
       default_presentation:    'fade',
       default_duration_frames: 20,
-
-      /**
-       * Per-chapter overrides (optional).
-       * Key = chapter index (0-based). Unset chapters use the defaults above.
-       */
-      chapter_overrides: {
-        // 0: { presentation: 'slide', duration_frames: 15 },
-      },
-
-      /** Slide / wipe direction when applicable */
-      slide_direction:  'from-right', // 'from-right' | 'from-left' | 'from-top' | 'from-bottom'
+      sequence:                ['fade', 'slide', 'dissolve', 'wipe', 'flip'],
+      chapter_overrides:       {},
+      slide_direction:  'from-right',
       wipe_angle_deg:   0,
       flip_direction:   'from-right',
+    },
+
+    effects: {
+      light_leak:      true,
+      motion_blur:     false,
+      accent_shapes:   true,
+      pulse_vignette:  false,
     },
 
     lower_thirds: {
@@ -275,6 +275,7 @@ export const DOCUMENTARY_TEMPLATES = [
   {
     id: 'template_cinematic_noir',
     name: 'Cinematic Noir',
+    format: 'longform',
     description:
       'High-contrast desaturated palette with gold accents. Ken Burns slow-zooms, typewriter titles, dramatic fade transitions.',
     style: 'noir_documentary',
@@ -430,6 +431,7 @@ export const DOCUMENTARY_TEMPLATES = [
   {
     id: 'template_hype_sports',
     name: 'Hype Sports',
+    format: 'longform',
     description:
       'Neon cyan/magenta, slam-scale subtitles, rapid wipe cuts. Built for social clips and highlight reels.',
     style: 'hype_sports_youtube',
@@ -589,6 +591,7 @@ export const DOCUMENTARY_TEMPLATES = [
   {
     id: 'template_premium_longform',
     name: 'Premium Longform',
+    format: 'longform',
     description:
       'Warm earth tones, editorial serif fonts, slow poetic pacing. Netflix / BBC documentary aesthetic.',
     style: 'premium_editorial_netflix',
@@ -742,6 +745,717 @@ export const DOCUMENTARY_TEMPLATES = [
       },
     },
   },
+
+  // ─── 5. EPIC CINEMATIC (advanced longform) ───────────────────────────────
+  {
+    id: 'template_epic_cinematic',
+    name: 'Epic Cinematic',
+    format: 'longform',
+    description:
+      'Clock wipes, flip transitions, light leaks, motion blur, and dramatic Ken Burns — premium documentary feel.',
+    style: 'epic_cinematic',
+
+    color_palette: {
+      primary:    '#3B82F6',
+      secondary:  '#F97316',
+      background: '#030712',
+      text:       '#F8FAFC',
+      muted:      '#64748B',
+      accent:     '#FBBF24',
+    },
+
+    font_heading: 'Bebas Neue',
+    font_body:    'Inter',
+    font_mono:    'JetBrains Mono',
+    google_fonts: ['Bebas+Neue:wght@400', 'Inter:wght@400;700;900'],
+
+    global_lut:           'cinematic_teal_orange',
+    film_grain_opacity:   0.1,
+    vignette_strength:    0.42,
+    chromatic_aberration: true,
+    glitch_intensity:     0.15,
+
+    audio: {
+      music_volume_under_narration: 0.12,
+      music_volume_full:            0.9,
+      duck_fade_frames:             18,
+    },
+
+    intro: {
+      style:             'cinematic_reveal',
+      bg:                'radial-gradient(ellipse at 50% 30%, #1e3a5f 0%, #030712 70%)',
+      title_color:       '#F8FAFC',
+      accent_color:      '#3B82F6',
+      duration_frames:   120,
+      title_in_frame:    30,
+      subtitle_in_frame: 55,
+    },
+
+    subtitles: {
+      mode:       'word_by_word',
+      chunk_size: 1,
+      layout: {
+        position: 'bottom_center', margin_bottom: 72, margin_left: 48, margin_right: 48,
+        max_width_px: 920,
+      },
+      style: {
+        font_size: 48, font_weight: '700', color: '#FFFFFF', highlight_color: '#FBBF24',
+        text_shadow: '0 4px 24px rgba(0,0,0,0.8)',
+        background: { enabled: true, color: 'rgba(3,7,18,0.65)', border_radius: 10, padding_x: 14, padding_y: 8 },
+        stroke: { enabled: false, color: '#000', width: 0 },
+      },
+      word_animation: {
+        enter: { type: 'fade_slide_right', duration_frames: 6, spring_mass: 0.9, spring_damping: 16 },
+        exit:  { type: 'fade', duration_frames: 4 },
+      },
+    },
+
+    chapter_badge: {
+      style: 'pill_accent', background: 'rgba(59,130,246,0.35)', border: '1px solid #3B82F6',
+      color: '#FFFFFF', letter_spacing: 1, text_transform: 'uppercase',
+      animation: {
+        enter: { type: 'slide_right_fade', duration_frames: 18 },
+        hold_frames: 90,
+        exit: { type: 'dissolve', duration_frames: 15 },
+      },
+    },
+
+    transitions: {
+      default_presentation:    'clock',
+      default_duration_frames: 22,
+      sequence:                ['clock', 'flip', 'dissolve', 'wipe', 'slide', 'fade'],
+      chapter_overrides: {
+        0: { presentation: 'fade', duration_frames: 28 },
+      },
+      slide_direction: 'from-right',
+      wipe_angle_deg:  45,
+      flip_direction:  'from-right',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: true, accent_shapes: true, pulse_vignette: true,
+    },
+
+    lower_thirds: {
+      style: 'gradient_bar', accent_line_color: '#3B82F6',
+      position_bottom: 110, position_left: 56,
+      name_font_size: 34, name_color: '#FFFFFF', title_font_size: 22, title_color: '#94A3B8',
+      animation: {
+        enter: { type: 'slide_right_fade', duration_frames: 20 },
+        hold_frames: 140,
+        exit: { type: 'fade', duration_frames: 16 },
+      },
+    },
+
+    progress_bar: {
+      style: 'gradient_top', height: 4,
+      color: 'linear-gradient(90deg, #3B82F6, #F97316, #FBBF24)',
+      position: 'top', opacity: 1,
+    },
+
+    corner_brackets: { enabled: true, color: '#3B82F6', size: 28, weight: 2 },
+
+    bg_effects: {
+      type: 'ken_burns_cinematic', scale_min: 1.0, scale_max: 1.12,
+      directions: ['zoom_in', 'pan_right', 'diagonal_tl', 'zoom_out', 'pan_left'],
+      easing: 'easeInOut', duration_multiplier: 1.1,
+    },
+
+    outro: {
+      style: 'cinematic_cta',
+      bg: 'radial-gradient(ellipse, #0f172a 0%, #030712 100%)',
+      duration_frames: 180, endcard_layout: 'full_4',
+      cta_colors: { subscribe: '#3B82F6', like: '#F97316' },
+    },
+  },
+
+  // ─── 6. DYNAMIC DOCUMENTARY (advanced longform) ───────────────────────────
+  {
+    id: 'template_dynamic_documentary',
+    name: 'Dynamic Documentary',
+    format: 'longform',
+    description:
+      'Ripple & dissolve cuts, accent shapes, punchy lower thirds — high-energy explainers and modern docs.',
+    style: 'dynamic_documentary',
+
+    color_palette: {
+      primary:    '#10B981',
+      secondary:  '#6366F1',
+      background: '#0B0F14',
+      text:       '#FFFFFF',
+      muted:      '#9CA3AF',
+      accent:     '#34D399',
+    },
+
+    font_heading: 'DM Sans',
+    font_body:    'Inter',
+    google_fonts: ['DM+Sans:wght@700;900', 'Inter:wght@400;700'],
+
+    global_lut:           'warm_contrast',
+    film_grain_opacity:   0.06,
+    vignette_strength:    0.28,
+    chromatic_aberration: true,
+    glitch_intensity:     0.25,
+
+    audio: {
+      music_volume_under_narration: 0.18,
+      music_volume_full:            0.95,
+      duck_fade_frames:             10,
+    },
+
+    intro: {
+      style: 'editorial_build',
+      bg: 'linear-gradient(160deg, #0B0F14 0%, #134E4A 50%, #1E1B4B 100%)',
+      title_color: '#FFFFFF', accent_color: '#10B981',
+      duration_frames: 75, title_in_frame: 18, subtitle_in_frame: 40,
+    },
+
+    subtitles: {
+      mode: 'word_by_word', chunk_size: 1,
+      layout: { position: 'bottom_center', margin_bottom: 88, max_width_px: 880 },
+      style: {
+        font_size: 50, font_weight: '800', color: '#FFFFFF', highlight_color: '#34D399',
+        background: { enabled: true, color: 'rgba(16,185,129,0.2)', border_radius: 6, padding_x: 10, padding_y: 4 },
+        stroke: { enabled: true, color: '#0B0F14', width: 2 },
+      },
+      word_animation: {
+        enter: { type: 'slam_scale', duration_frames: 5, spring_mass: 0.55, spring_damping: 11 },
+        exit: { type: 'instant_pop', duration_frames: 3 },
+      },
+    },
+
+    chapter_badge: {
+      style: 'neon_pill',
+      background: 'linear-gradient(90deg, rgba(16,185,129,0.2), rgba(99,102,241,0.2))',
+      border: '1px solid #10B981', color: '#34D399', text_transform: 'uppercase',
+      animation: {
+        enter: { type: 'slide_right_fade', duration_frames: 10 },
+        hold_frames: 55,
+        exit: { type: 'slide_left_fade', duration_frames: 8 },
+      },
+    },
+
+    transitions: {
+      default_presentation:    'ripple',
+      default_duration_frames: 14,
+      sequence:                ['ripple', 'dissolve', 'slide', 'wipe', 'flip', 'fade'],
+      chapter_overrides:       {},
+      slide_direction:         'from-bottom',
+      wipe_angle_deg:          135,
+      flip_direction:          'from-right',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: true, accent_shapes: true, pulse_vignette: false,
+    },
+
+    lower_thirds: {
+      style: 'cyber_bar', accent_line_color: '#10B981',
+      position_bottom: 115, position_left: 48,
+      name_font_size: 30, name_color: '#FFFFFF', title_font_size: 20, title_color: '#34D399',
+      animation: {
+        enter: { type: 'slide_right_fade', duration_frames: 12 },
+        hold_frames: 100,
+        exit: { type: 'slide_left_fade', duration_frames: 10 },
+      },
+    },
+
+    progress_bar: {
+      style: 'neon_gradient', height: 4,
+      color: 'linear-gradient(90deg, #10B981, #6366F1)', position: 'top', opacity: 1,
+    },
+
+    corner_brackets: { enabled: true, color: '#10B981', size: 22, weight: 2 },
+
+    bg_effects: {
+      type: 'quick_zoom_cuts', scale_min: 1.0, scale_max: 1.14,
+      directions: ['zoom_in', 'pan_right', 'zoom_in', 'diagonal_br'],
+      easing: 'easeOut', duration_multiplier: 0.85,
+    },
+
+    outro: {
+      style: 'neon_endcard',
+      bg: 'linear-gradient(180deg, #134E4A 0%, #0B0F14 100%)',
+      duration_frames: 120, endcard_layout: 'full_4',
+      cta_colors: { subscribe: '#10B981', like: '#6366F1' },
+    },
+  },
+
+  // ─── 7. YOUTUBE SHORTS (9:16 vertical) ───────────────────────────────────
+  {
+    id: 'template_youtube_shorts',
+    name: 'YouTube Shorts',
+    format: 'shorts',
+    description:
+      'Vertical 9:16 — punchy hook intro, bottom captions, fast wipes. Default Shorts export.',
+    style: 'youtube_shorts_vertical',
+    aspect_ratio: '9:16',
+
+    color_palette: {
+      primary:    '#FF0033',
+      secondary:  '#FFFFFF',
+      background: '#0A0A0A',
+      text:       '#FFFFFF',
+      muted:      '#A1A1AA',
+      accent:     '#FACC15',
+    },
+
+    font_heading: 'Bebas Neue',
+    font_body:    'Inter',
+    font_mono:    'JetBrains Mono',
+    google_fonts: ['Bebas+Neue:wght@400', 'Inter:wght@700;900'],
+
+    global_lut:           'warm_contrast',
+    film_grain_opacity:   0.03,
+    vignette_strength:    0.15,
+    chromatic_aberration: false,
+
+    audio: {
+      music_volume_under_narration: 0.18,
+      music_volume_full:            0.9,
+      duck_fade_frames:             8,
+    },
+
+    intro: {
+      style:             'glitch_slam',
+      bg:                'linear-gradient(180deg, #0A0A0A 0%, #1a0a14 100%)',
+      title_color:       '#FFFFFF',
+      accent_color:      '#FF0033',
+      duration_frames:   45,
+      title_in_frame:    8,
+      subtitle_in_frame: 20,
+    },
+
+    subtitles: {
+      mode:       'word_by_word',
+      chunk_size: 1,
+
+      layout: {
+        position:      'bottom_center',
+        margin_bottom: 140,
+        margin_left:   32,
+        margin_right:  32,
+        max_width_px:  960,
+      },
+
+      style: {
+        font_size:       56,
+        font_weight:     '900',
+        font_style:      'normal',
+        letter_spacing:  0,
+        text_transform:  'none',
+        color:           '#FFFFFF',
+        highlight_color: '#FF0033',
+        text_shadow:     '0 2px 12px rgba(0,0,0,0.85)',
+        background: {
+          enabled:       true,
+          color:         'rgba(0,0,0,0.55)',
+          border_radius: 8,
+          padding_x:     16,
+          padding_y:     8,
+        },
+        stroke: { enabled: true, color: '#000000', width: 2 },
+      },
+
+      word_animation: {
+        enter: { type: 'pop_scale', duration_frames: 4, spring_mass: 0.6, spring_damping: 12 },
+        exit:  { type: 'fade', duration_frames: 3 },
+      },
+    },
+
+    chapter_badge: {
+      style:          'pill_compact',
+      background:     'rgba(255,0,51,0.2)',
+      border:         '1px solid #FF0033',
+      border_left:    null,
+      border_bottom:  null,
+      color:          '#FFFFFF',
+      box_shadow:     '0 4px 20px rgba(255,0,51,0.35)',
+      font_style:     'normal',
+      letter_spacing: 1,
+      text_transform: 'uppercase',
+      animation: {
+        enter: { type: 'slide_up_fade', duration_frames: 6 },
+        hold_frames:    36,
+        exit:  { type: 'fade', duration_frames: 5 },
+      },
+    },
+
+    transitions: {
+      default_presentation:    'wipe',
+      default_duration_frames: 6,
+      sequence:                ['wipe', 'flip', 'slide', 'wipe', 'clock', 'fade'],
+      chapter_overrides:       {
+        0: { presentation: 'fade', duration_frames: 8 },
+      },
+      slide_direction:         'from-bottom',
+      wipe_angle_deg:          90,
+      flip_direction:          'from-bottom',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: true, accent_shapes: true, pulse_vignette: false,
+    },
+
+    lower_thirds: {
+      style:             'minimal_tag',
+      accent_line_color: '#FF0033',
+      position_bottom:   200,
+      position_left:     40,
+      name_font_size:    32,
+      name_font_weight:  '900',
+      name_color:        '#FFFFFF',
+      title_font_size:   20,
+      title_color:       '#FF0033',
+      animation: {
+        enter: { type: 'slide_up_fade', duration_frames: 8 },
+        hold_frames:      60,
+        exit:  { type: 'fade', duration_frames: 6 },
+      },
+    },
+
+    progress_bar: {
+      style:    'solid_accent',
+      height:   3,
+      color:    '#FF0033',
+      position: 'top',
+      opacity:  1,
+    },
+
+    corner_brackets: { enabled: false, color: '#FF0033', size: 16, weight: 2 },
+
+    bg_effects: {
+      type:                'quick_zoom_cuts',
+      scale_min:           1.0,
+      scale_max:           1.1,
+      directions:          ['zoom_in', 'pan_up', 'zoom_in', 'pan_down'],
+      easing:              'easeOut',
+      duration_multiplier: 0.75,
+    },
+
+    outro: {
+      style:           'minimal_fade',
+      bg:              '#0A0A0A',
+      duration_frames: 60,
+      endcard_layout:  'minimal_2',
+      cta_colors: {
+        subscribe: '#FF0033',
+        like:      '#FACC15',
+      },
+    },
+  },
+
+  // ─── 8. SHORTS VIRAL BURST ───────────────────────────────────────────────
+  {
+    id: 'template_shorts_viral_burst',
+    name: 'Viral Burst',
+    format: 'shorts',
+    description:
+      'Ultra-fast flip/wipe rhythm, glitch intro, slam captions — maximum retention Shorts.',
+    style: 'shorts_viral_burst',
+    aspect_ratio: '9:16',
+
+    color_palette: {
+      primary: '#FFE600', secondary: '#FF006E', background: '#000000',
+      text: '#FFFFFF', muted: '#888888', accent: '#00F5FF',
+    },
+
+    font_heading: 'Black Han Sans',
+    font_body: 'DM Sans',
+    google_fonts: ['Black+Han+Sans:wght@400', 'DM+Sans:wght@900'],
+
+    global_lut: 'warm_contrast',
+    film_grain_opacity: 0.05,
+    vignette_strength: 0.22,
+    chromatic_aberration: true,
+    glitch_intensity: 0.75,
+
+    audio: { music_volume_under_narration: 0.22, music_volume_full: 1.0, duck_fade_frames: 5 },
+
+    intro: {
+      style: 'glitch_slam',
+      bg: 'linear-gradient(135deg, #000 0%, #1a0030 100%)',
+      title_color: '#FFFFFF', accent_color: '#FFE600',
+      duration_frames: 36, title_in_frame: 6, subtitle_in_frame: 16,
+    },
+
+    subtitles: {
+      mode: 'word_by_word', chunk_size: 1,
+      layout: { position: 'center', margin_bottom: 0, max_width_px: 900 },
+      style: {
+        font_size: 64, font_weight: '900', text_transform: 'uppercase',
+        color: '#FFFFFF', highlight_color: '#FFE600',
+        text_shadow: '0 0 24px #FF006E, 0 4px 0 #000',
+        background: { enabled: false, color: 'transparent', border_radius: 0, padding_x: 0, padding_y: 0 },
+        stroke: { enabled: true, color: '#000000', width: 4 },
+      },
+      word_animation: {
+        enter: { type: 'slam_scale', duration_frames: 3, spring_mass: 0.45, spring_damping: 9 },
+        exit: { type: 'instant_pop', duration_frames: 2 },
+      },
+    },
+
+    chapter_badge: {
+      style: 'neon_pill', background: 'rgba(255,230,0,0.15)', border: '2px solid #FFE600',
+      color: '#FFE600', text_transform: 'uppercase',
+      animation: {
+        enter: { type: 'slam_scale', duration_frames: 4 },
+        hold_frames: 28,
+        exit: { type: 'instant_pop', duration_frames: 3 },
+      },
+    },
+
+    transitions: {
+      default_presentation: 'flip',
+      default_duration_frames: 4,
+      sequence: ['flip', 'wipe', 'wipe', 'slide', 'flip', 'clock'],
+      slide_direction: 'from-bottom',
+      wipe_angle_deg: 90,
+      flip_direction: 'from-right',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: true, accent_shapes: true, pulse_vignette: true,
+    },
+
+    lower_thirds: {
+      style: 'cyber_bar', accent_line_color: '#FFE600',
+      position_bottom: 180, position_left: 32,
+      name_font_size: 34, name_color: '#FFF', title_font_size: 18, title_color: '#00F5FF',
+      animation: {
+        enter: { type: 'slam_scale', duration_frames: 5 },
+        hold_frames: 45,
+        exit: { type: 'instant_pop', duration_frames: 3 },
+      },
+    },
+
+    progress_bar: {
+      style: 'neon_gradient', height: 5,
+      color: 'linear-gradient(90deg, #FFE600, #FF006E, #00F5FF)',
+      position: 'top', opacity: 1,
+    },
+
+    corner_brackets: { enabled: true, color: '#FFE600', size: 18, weight: 3 },
+
+    bg_effects: {
+      type: 'quick_zoom_cuts', scale_min: 1.0, scale_max: 1.18,
+      directions: ['zoom_in', 'zoom_in', 'pan_up', 'diagonal_br'],
+      easing: 'easeOut', duration_multiplier: 0.55,
+    },
+
+    outro: {
+      style: 'neon_endcard', bg: '#000000', duration_frames: 45,
+      endcard_layout: 'minimal_2',
+      cta_colors: { subscribe: '#FFE600', like: '#FF006E' },
+    },
+  },
+
+  // ─── 9. SHORTS NEON PULSE ──────────────────────────────────────────────────
+  {
+    id: 'template_shorts_neon_pulse',
+    name: 'Neon Pulse',
+    format: 'shorts',
+    description:
+      'Ripple & clock transitions, chromatic glow, motion blur — cyber / tech Shorts.',
+    style: 'shorts_neon_pulse',
+    aspect_ratio: '9:16',
+
+    color_palette: {
+      primary: '#00F5FF', secondary: '#BF00FF', background: '#050510',
+      text: '#FFFFFF', muted: '#8892B0', accent: '#00F5FF',
+    },
+
+    font_heading: 'Share Tech Mono',
+    font_body: 'DM Sans',
+    google_fonts: ['Share+Tech+Mono', 'DM+Sans:wght@700;900'],
+
+    global_lut: 'cool_blue',
+    film_grain_opacity: 0.04,
+    vignette_strength: 0.25,
+    chromatic_aberration: true,
+    glitch_intensity: 0.5,
+
+    audio: { music_volume_under_narration: 0.2, music_volume_full: 0.95, duck_fade_frames: 6 },
+
+    intro: {
+      style: 'glitch_slam',
+      bg: 'radial-gradient(circle, #1a0a2e 0%, #050510 100%)',
+      title_color: '#00F5FF', accent_color: '#BF00FF',
+      duration_frames: 42, title_in_frame: 8, subtitle_in_frame: 22,
+    },
+
+    subtitles: {
+      mode: 'word_by_word', chunk_size: 1,
+      layout: { position: 'bottom_center', margin_bottom: 150, max_width_px: 940 },
+      style: {
+        font_size: 52, font_weight: '900', color: '#FFFFFF', highlight_color: '#00F5FF',
+        text_shadow: '0 0 20px #00F5FF',
+        background: { enabled: true, color: 'rgba(0,245,255,0.12)', border_radius: 6, padding_x: 12, padding_y: 6 },
+        stroke: { enabled: true, color: '#000', width: 2 },
+      },
+      word_animation: {
+        enter: { type: 'pop_scale', duration_frames: 4, spring_mass: 0.5, spring_damping: 10 },
+        exit: { type: 'fade', duration_frames: 3 },
+      },
+    },
+
+    chapter_badge: {
+      style: 'neon_pill',
+      background: 'rgba(0,245,255,0.15)', border: '1px solid #00F5FF', color: '#00F5FF',
+      animation: {
+        enter: { type: 'slide_up_fade', duration_frames: 5 },
+        hold_frames: 32,
+        exit: { type: 'fade', duration_frames: 4 },
+      },
+    },
+
+    transitions: {
+      default_presentation: 'ripple',
+      default_duration_frames: 5,
+      sequence: ['ripple', 'clock', 'wipe', 'flip', 'slide', 'dissolve'],
+      slide_direction: 'from-right',
+      wipe_angle_deg: 0,
+      flip_direction: 'from-right',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: true, accent_shapes: true, pulse_vignette: true,
+    },
+
+    lower_thirds: {
+      style: 'cyber_bar', accent_line_color: '#00F5FF',
+      position_bottom: 190, position_left: 36,
+      name_font_size: 30, name_color: '#FFF', title_font_size: 18, title_color: '#BF00FF',
+      animation: {
+        enter: { type: 'slide_right_fade', duration_frames: 7 },
+        hold_frames: 50,
+        exit: { type: 'slide_left_fade', duration_frames: 5 },
+      },
+    },
+
+    progress_bar: {
+      style: 'neon_gradient', height: 4,
+      color: 'linear-gradient(90deg, #00F5FF, #BF00FF)',
+      position: 'top', opacity: 1,
+    },
+
+    corner_brackets: { enabled: true, color: '#00F5FF', size: 20, weight: 2 },
+
+    bg_effects: {
+      type: 'quick_zoom_cuts', scale_min: 1.0, scale_max: 1.15,
+      directions: ['zoom_in', 'pan_right', 'zoom_in', 'pan_left'],
+      easing: 'easeOut', duration_multiplier: 0.65,
+    },
+
+    outro: {
+      style: 'neon_endcard',
+      bg: 'radial-gradient(ellipse, #1a0a2e 0%, #050510 100%)',
+      duration_frames: 54, endcard_layout: 'minimal_2',
+      cta_colors: { subscribe: '#00F5FF', like: '#BF00FF' },
+    },
+  },
+
+  // ─── 10. SHORTS STORY MODE ────────────────────────────────────────────────
+  {
+    id: 'template_shorts_story_mode',
+    name: 'Story Mode',
+    format: 'shorts',
+    description:
+      'Softer dissolves, editorial captions, warm light leaks — narrative & explainer Shorts.',
+    style: 'shorts_story_mode',
+    aspect_ratio: '9:16',
+
+    color_palette: {
+      primary: '#E8DCC8', secondary: '#C4956A', background: '#1C1410',
+      text: '#F0EAE0', muted: '#9A8B78', accent: '#D4622A',
+    },
+
+    font_heading: 'Playfair Display',
+    font_body: 'Inter',
+    google_fonts: ['Playfair+Display:wght@700', 'Inter:wght@400;600'],
+
+    global_lut: 'warm_golden',
+    film_grain_opacity: 0.07,
+    vignette_strength: 0.32,
+    chromatic_aberration: false,
+
+    audio: { music_volume_under_narration: 0.14, music_volume_full: 0.8, duck_fade_frames: 14 },
+
+    intro: {
+      style: 'editorial_build',
+      bg: 'linear-gradient(180deg, #1C1410 0%, #2a2018 100%)',
+      title_color: '#F0EAE0', accent_color: '#C4956A',
+      duration_frames: 60, title_in_frame: 14, subtitle_in_frame: 32,
+    },
+
+    subtitles: {
+      mode: 'line_by_line', chunk_size: 6,
+      layout: { position: 'bottom_center', margin_bottom: 160, max_width_px: 920 },
+      style: {
+        font_size: 44, font_weight: '600', font_style: 'italic',
+        color: '#F0EAE0', highlight_color: '#D4622A',
+        background: { enabled: true, color: 'rgba(28,20,16,0.7)', border_radius: 4, padding_x: 14, padding_y: 10 },
+        stroke: { enabled: false, color: '#000', width: 0 },
+      },
+      word_animation: {
+        enter: { type: 'fade_slide_right', duration_frames: 8, spring_mass: 1, spring_damping: 18 },
+        exit: { type: 'fade', duration_frames: 6 },
+      },
+    },
+
+    chapter_badge: {
+      style: 'editorial_category',
+      background: 'transparent', border_bottom: '2px solid #C4956A',
+      color: '#E8DCC8', font_style: 'italic', text_transform: 'none',
+      animation: {
+        enter: { type: 'fade_slide_right', duration_frames: 20 },
+        hold_frames: 70,
+        exit: { type: 'fade', duration_frames: 18 },
+      },
+    },
+
+    transitions: {
+      default_presentation: 'dissolve',
+      default_duration_frames: 12,
+      sequence: ['dissolve', 'fade', 'slide', 'dissolve', 'fade'],
+      slide_direction: 'from-left',
+      wipe_angle_deg: 0,
+      flip_direction: 'from-left',
+    },
+
+    effects: {
+      light_leak: true, motion_blur: false, accent_shapes: false, pulse_vignette: false,
+    },
+
+    lower_thirds: {
+      style: 'editorial_serif', accent_line_color: '#C4956A',
+      position_bottom: 210, position_left: 44,
+      name_font_size: 28, name_color: '#F0EAE0', title_font_size: 18, title_color: '#9A8B78',
+      animation: {
+        enter: { type: 'fade_slide_right', duration_frames: 22 },
+        hold_frames: 80,
+        exit: { type: 'fade', duration_frames: 18 },
+      },
+    },
+
+    progress_bar: {
+      style: 'warm_thin', height: 2, color: '#C4956A', position: 'bottom', opacity: 0.6,
+    },
+
+    corner_brackets: { enabled: false, color: '#C4956A', size: 20, weight: 1 },
+
+    bg_effects: {
+      type: 'ken_burns_poetic', scale_min: 1.0, scale_max: 1.06,
+      directions: ['zoom_in', 'pan_left', 'pan_up', 'zoom_out'],
+      easing: 'easeInOut', duration_multiplier: 1.2,
+    },
+
+    outro: {
+      style: 'warm_editorial_close', bg: '#1C1410', duration_frames: 75,
+      endcard_layout: 'minimal_2',
+      cta_colors: { subscribe: '#C4956A', like: '#D4622A' },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -782,19 +1496,30 @@ export function getDocumentaryTemplate(templateId) {
  * @returns {{ id, name, description, style }[]}
  */
 export function listDocumentaryTemplates() {
-  return DOCUMENTARY_TEMPLATES.map(({ id, name, description, style, color_palette }) => ({
+  return listTemplatesByFormat('longform');
+}
+
+/**
+ * @param {'longform' | 'shorts'} format
+ */
+export function listTemplatesByFormat(format = 'longform') {
+  return DOCUMENTARY_TEMPLATES.filter(
+    (t) => (t.format || 'longform') === format,
+  ).map(({ id, name, description, style, format: fmt, color_palette }) => ({
     id,
     name,
     description,
     style,
-    /** Preview swatch colours for the template picker UI */
+    format: fmt || 'longform',
     swatch: {
-      primary:    color_palette.primary,
-      secondary:  color_palette.secondary,
-      background: color_palette.background,
+      primary: color_palette?.primary,
+      secondary: color_palette?.secondary,
+      background: color_palette?.background,
     },
   }));
 }
+
+export const DEFAULT_SHORTS_TEMPLATE_ID = 'template_youtube_shorts';
 
 // ---------------------------------------------------------------------------
 // resolveVisualTheme — flat Remotion-ready token map
@@ -867,28 +1592,46 @@ export function resolveVisualTheme(templateOrId) {
     vignette:            t.vignette_strength     ?? 0.35,
     chromaticAberration: t.chromatic_aberration  ?? false,
     glitchIntensity:     t.glitch_intensity      ?? 0,
-    effects: {
-      filmGrain:           t.film_grain_opacity    ?? 0.08,
-      vignette:            t.vignette_strength     ?? 0.35,
-      chromaticAberration: t.chromatic_aberration  ?? false,
-      glitchIntensity:     t.glitch_intensity      ?? 0,
-      lightLeak:
+    effects: (() => {
+      const fx = t.effects || {};
+      const styleLightLeak =
         t.style === 'cinematic_dark' ||
         t.style === 'premium_editorial_netflix' ||
-        t.style === 'hype_sports_youtube',
-      lightLeakHue:
-        t.style === 'hype_sports_youtube'
-          ? 210
-          : t.style === 'premium_editorial_netflix'
-            ? 32
-            : 275,
-      accentShapes:
         t.style === 'hype_sports_youtube' ||
-        t.style === 'cinematic_dark',
-      motionBlur:
+        t.style === 'epic_cinematic' ||
+        t.style === 'dynamic_documentary' ||
+        String(t.format) === 'shorts';
+      const styleMotionBlur =
         t.style === 'hype_sports_youtube' ||
-        trans.default_presentation === 'wipe',
-    },
+        t.style === 'shorts_viral_burst' ||
+        t.style === 'shorts_neon_pulse' ||
+        t.style === 'epic_cinematic' ||
+        t.style === 'dynamic_documentary' ||
+        trans.default_presentation === 'wipe' ||
+        trans.default_presentation === 'flip';
+      return {
+        filmGrain: t.film_grain_opacity ?? 0.08,
+        vignette: t.vignette_strength ?? 0.35,
+        chromaticAberration: t.chromatic_aberration ?? false,
+        glitchIntensity: t.glitch_intensity ?? 0,
+        lightLeak: fx.light_leak ?? styleLightLeak,
+        lightLeakHue:
+          fx.light_leak_hue ??
+          (t.style === 'hype_sports_youtube' || t.style === 'shorts_neon_pulse'
+            ? 210
+            : t.style === 'premium_editorial_netflix' || t.style === 'shorts_story_mode'
+              ? 32
+              : 275),
+        accentShapes:
+          fx.accent_shapes ??
+          (t.style === 'hype_sports_youtube' ||
+            t.style === 'cinematic_dark' ||
+            t.style === 'dynamic_documentary' ||
+            t.style === 'shorts_viral_burst'),
+        motionBlur: fx.motion_blur ?? styleMotionBlur,
+        pulseVignette: fx.pulse_vignette ?? false,
+      };
+    })(),
 
     // ── Audio
     audio: {
@@ -1006,6 +1749,7 @@ export function resolveVisualTheme(templateOrId) {
     transitions: {
       presentation:    safePresentation,
       durationFrames:  trans.default_duration_frames || 20,
+      sequence: (trans.sequence || []).filter((name) => VALID_TRANSITIONS.includes(name)),
       chapterOverrides: Object.fromEntries(
         Object.entries(trans.chapter_overrides || {}).map(([k, v]) => [
           k,
@@ -1124,15 +1868,17 @@ export function getIntroGraphicSec(templateId, fps = DEFAULT_FPS) {
  */
 export function getTransitionConfig(templateId, chapterIndex = 0) {
   const theme = resolveVisualTheme(getDocumentaryTemplate(templateId));
-  const tr    = theme.transitions;
-  const over  = tr.chapterOverrides[chapterIndex];
+  const tr = theme.transitions;
+  const over = tr.chapterOverrides[chapterIndex];
+  const seq = tr.sequence?.length ? tr.sequence : [tr.presentation];
+  const presentation = over?.presentation || seq[chapterIndex % seq.length] || tr.presentation;
 
   return {
-    presentation:    over?.presentation   || tr.presentation,
-    durationFrames:  over?.durationFrames || tr.durationFrames,
-    slideDirection:  tr.slideDirection,
-    wipeAngleDeg:    tr.wipeAngleDeg,
-    flipDirection:   tr.flipDirection,
+    presentation,
+    durationFrames: over?.durationFrames || tr.durationFrames,
+    slideDirection: tr.slideDirection,
+    wipeAngleDeg: tr.wipeAngleDeg,
+    flipDirection: tr.flipDirection,
   };
 }
 

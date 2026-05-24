@@ -7,6 +7,11 @@
     "apps/*",
     "packages/*"
   ],
+  "dependencies": {
+    "@docuforge/api": "*",
+    "@docuforge/config": "*",
+    "@docuforge/remotion": "*"
+  },
   "scripts": {
     "kill:ports": "node scripts/kill-ports.mjs",
     "dev:check-ports": "node scripts/warn-if-ports-busy.mjs",
@@ -18,6 +23,7 @@
     "start": "npm run build && concurrently -k -n api,desktop -c blue,magenta \"npm run start -w @docuforge/api\" \"wait-on tcp:3847 && npm run start -w @docuforge/desktop\"",
     "start:web": "npm run build -w @docuforge/web && concurrently -k -n api,web -c blue,magenta \"npm run start -w @docuforge/api\" \"wait-on tcp:3847 && npm run preview -w @docuforge/web\"",
     "build:electron": "npm run build && npm run build:app -w @docuforge/desktop",
+    "build:exe": "node scripts/build-exe.mjs",
     "remotion:studio": "npm run studio -w @docuforge/remotion",
     "remotion:render": "npm run render:documentary -w @docuforge/remotion",
     "remotion:render:walkthrough": "npm run render:walkthrough -w @docuforge/remotion",

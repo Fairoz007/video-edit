@@ -13,11 +13,12 @@ const STAGES = [
   'moviepy',
   'remotion',
   'ffmpeg',
+  'shorts',
   'done',
 ];
 
 export function RenderProgress() {
-  const { progress, stage, message, status, outputPath } = useProjectStore();
+  const { progress, stage, message, status, outputPath, outputPaths } = useProjectStore();
   const { cancelRenderFlow, restartRenderFlow } = useDocumentaryPipeline();
   const stageIndex = STAGES.indexOf(stage);
   const isRendering = status === 'rendering';
@@ -99,13 +100,22 @@ export function RenderProgress() {
         </div>
 
         {outputPath && status === 'completed' && (
-          <button
-            type="button"
-            className="mt-3 text-xs text-sky-400 hover:text-sky-300 transition-colors"
-            onClick={() => window.docuforge?.showItemInFolder(outputPath)}
-          >
-            Open export folder →
-          </button>
+          <div className="mt-3 space-y-1">
+            {outputPaths && outputPaths.length > 1 && (
+              <p className="text-[10px] text-emerald-400/90">
+                {outputPaths.some((p) => /-full\./i.test(p))
+                  ? `Full video + ${outputPaths.filter((p) => /-short-/i.test(p)).length || outputPaths.length - 1} Short part(s)`
+                  : `${outputPaths.length} export file(s) ready`}
+              </p>
+            )}
+            <button
+              type="button"
+              className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+              onClick={() => window.docuforge?.showItemInFolder(outputPath)}
+            >
+              Open export folder →
+            </button>
+          </div>
         )}
       </motion.div>
     </AnimatePresence>

@@ -10,7 +10,8 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "dev": "tsc -p tsconfig.electron.json && wait-on tcp:5173 tcp:3847 && cross-env NODE_ENV=development electron .",
     "start": "npm run build:electron && cross-env NODE_ENV=production electron .",
-    "build:app": "npm run build:electron -w @docuforge/desktop && npm run build -w @docuforge/web && electron-builder"
+    "build:app": "electron-builder --config electron-builder.config.cjs",
+    "build:win": "electron-builder --win --config electron-builder.config.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -19,25 +20,5 @@
     "electron-builder": "26.8.1",
     "typescript": "^5.7.2",
     "wait-on": "^8.0.1"
-  },
-  "build": {
-    "appId": "com.docuforge.app",
-    "productName": "DocuForge",
-    "directories": {
-      "output": "../../release"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "../web/dist/**/*",
-      "../api/**/*",
-      "../../packages/remotion/**/*",
-      "../../projects/**/*"
-    ],
-    "mac": {
-      "category": "public.app-category.video"
-    },
-    "win": {
-      "target": "nsis"
-    }
   }
 }

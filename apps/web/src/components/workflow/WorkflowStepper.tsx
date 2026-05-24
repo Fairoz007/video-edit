@@ -14,12 +14,12 @@ import { useUiStore, type WorkflowStepId } from '../../hooks/useUiStore';
 import { isVideoOnlyEditMode } from '../../utils/timelineSync';
 
 const STEPS = [
-  { id: 1 as WorkflowStepId, label: 'Input', short: 'Input', icon: PenLine },
-  { id: 2 as WorkflowStepId, label: 'Script', short: 'Script', icon: FileText },
-  { id: 3 as WorkflowStepId, label: 'Media', short: 'Media', icon: Image },
-  { id: 4 as WorkflowStepId, label: 'Narration', short: 'Voice', icon: Mic },
-  { id: 5 as WorkflowStepId, label: 'Timeline', short: 'Edit', icon: Layers },
-  { id: 6 as WorkflowStepId, label: 'Render', short: 'Export', icon: Clapperboard },
+  { id: 1 as WorkflowStepId, label: 'Input', icon: PenLine },
+  { id: 2 as WorkflowStepId, label: 'Script', icon: FileText },
+  { id: 3 as WorkflowStepId, label: 'Media', icon: Image },
+  { id: 4 as WorkflowStepId, label: 'Narration', icon: Mic },
+  { id: 5 as WorkflowStepId, label: 'Timeline', icon: Layers },
+  { id: 6 as WorkflowStepId, label: 'Render', icon: Clapperboard },
 ];
 
 type StepStatus = 'idle' | 'active' | 'done' | 'processing';
@@ -30,7 +30,6 @@ function getStepStatuses(
   narrationReady: boolean,
   sceneCount: number,
   renderStatus: string,
-  _progress: number,
   videoOnly: boolean,
 ): Record<WorkflowStepId, StepStatus> {
   const hasScript = scriptSections > 0;
@@ -41,13 +40,7 @@ function getStepStatuses(
     1: hasScript || hasMedia ? 'done' : 'active',
     2: renderStatus === 'generating' && !hasScript ? 'processing' : hasScript ? 'done' : hasMedia ? 'active' : 'idle',
     3: hasMedia ? 'done' : hasScript ? 'active' : 'idle',
-    4: videoOnly
-      ? 'done'
-      : narrationReady
-        ? 'done'
-        : hasScript
-          ? 'active'
-          : 'idle',
+    4: videoOnly ? 'done' : narrationReady ? 'done' : hasScript ? 'active' : 'idle',
     5: hasTimeline ? 'done' : hasScript ? 'active' : 'idle',
     6:
       renderStatus === 'completed'
@@ -60,8 +53,15 @@ function getStepStatuses(
   };
 }
 
+function stepIconClass(status: StepStatus, selected: boolean): string {
+  if (status === 'done') return 'workflow-step-done';
+  if (status === 'processing') return 'workflow-step-active';
+  if (selected || status === 'active') return 'workflow-step-active ring-2 ring-forge-glow/30';
+  return 'workflow-step-idle';
+}
+
 export function WorkflowStepper() {
-  const { script, media, timeline, status, progress, input } = useProjectStore();
+  const { script, media, timeline, status, input } = useProjectStore();
   const { activeWorkflowStep, setActiveWorkflowStep, setSourcePanelOpen } = useUiStore();
   const videoOnly = isVideoOnlyEditMode(input.editMode);
 
@@ -77,7 +77,6 @@ export function WorkflowStepper() {
     narrationReady,
     sceneCount,
     status,
-    progress,
     videoOnly,
   );
 
@@ -88,66 +87,74 @@ export function WorkflowStepper() {
     if (id === 1) setSourcePanelOpen(true);
   };
 
-  return (
-    <nav
-      className="flex items-stretch gap-0.5 px-1 py-1 rounded-studio-lg bg-forge-surface/80 border border-forge-border overflow-x-auto shrink-0"
-      aria-label="Production workflow"
-    >
-      {visibleSteps.map((step, index) => {
-        const stepStatus = statuses[step.id];
-        const isSelected = activeWorkflowStep === step.id;
-        const Icon = step.icon;
+  const doneCount = visibleSteps.filter((s) => statuses[s.id] === 'done').length;
+  const progressPct = (doneCount / visibleSteps.length) * 100;
 
-        return (
-          <div key={step.id} className="flex items-center shrink-0">
-            {index > 0 && (
-              <motion.div
-                className={`w-6 h-px mx-0.5 shrink-0 ${
-                  statuses[visibleSteps[index - 1].id] === 'done' ? 'bg-forge-accent/50' : 'bg-forge-border'
+  return (
+    <nav className="glass-panel-elevated px-3 py-3 shrink-0" aria-label="Production workflow">
+      <div className="flex items-center justify-between mb-2.5 px-0.5">
+        <span className="section-label">Production pipeline</span>
+        <span className="text-[11px] font-mono text-forge-muted tabular-nums">
+          {doneCount}/{visibleSteps.length} complete
+        </span>
+      </div>
+
+      <div className="h-1 rounded-full bg-black/40 overflow-hidden mb-3 border border-forge-border/40">
+        <motion.div
+          className="h-full accent-gradient"
+          initial={{ width: 0 }}
+          animate={{ width: `${progressPct}%` }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+
+      <div className="flex items-center gap-0 overflow-x-auto pb-0.5">
+        {visibleSteps.map((step, index) => {
+          const stepStatus = statuses[step.id];
+          const isSelected = activeWorkflowStep === step.id;
+          const Icon = step.icon;
+          const prevDone = index > 0 && statuses[visibleSteps[index - 1].id] === 'done';
+
+          return (
+            <div key={step.id} className="flex items-center shrink-0">
+              {index > 0 && (
+                <div className={prevDone ? 'workflow-connector-done' : 'workflow-connector-idle'} />
+              )}
+              <motion.button
+                type="button"
+                onClick={() => onSelect(step.id)}
+                className={`relative flex items-center gap-2.5 px-3 py-2 rounded-studio-lg transition-all duration-200 min-w-[100px] ${
+                  isSelected
+                    ? 'bg-white/[0.06] border border-forge-border-accent shadow-glow-sm'
+                    : 'border border-transparent hover:bg-white/[0.04]'
                 }`}
-              />
-            )}
-            <motion.button
-              type="button"
-              onClick={() => onSelect(step.id)}
-              className={`relative flex items-center gap-2 px-3 py-2 rounded-studio transition-all duration-200 min-w-[88px] ${
-                isSelected
-                  ? 'bg-white/[0.08] text-forge-text border border-forge-border-strong'
-                  : 'text-forge-text-secondary hover:text-forge-text hover:bg-white/[0.04] border border-transparent'
-              }`}
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span
-                className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 ${
-                  stepStatus === 'done'
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : stepStatus === 'processing'
-                      ? 'accent-gradient text-white'
-                      : isSelected
-                        ? 'bg-forge-accent/20 text-forge-glow'
-                        : 'bg-white/[0.04] text-forge-muted'
-                }`}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
               >
-                {stepStatus === 'processing' ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : stepStatus === 'done' ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  <Icon className="w-3.5 h-3.5" />
-                )}
-              </span>
-              <span className="text-left hidden sm:block">
-                <span className="block text-[10px] font-mono text-forge-muted leading-none mb-0.5">
-                  {String(step.id).padStart(2, '0')}
+                <span
+                  className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-shadow ${stepIconClass(stepStatus, isSelected)}`}
+                >
+                  {stepStatus === 'processing' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : stepStatus === 'done' ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Icon className="w-4 h-4" />
+                  )}
                 </span>
-                <span className="block text-xs font-semibold leading-tight">{step.label}</span>
-              </span>
-              <span className="sm:hidden text-xs font-semibold">{step.short}</span>
-            </motion.button>
-          </div>
-        );
-      })}
+                <span className="text-left hidden sm:block">
+                  <span className="block text-[10px] font-mono text-forge-muted leading-none mb-0.5">
+                    {String(step.id).padStart(2, '0')}
+                  </span>
+                  <span className="block text-xs font-semibold text-forge-text leading-tight">
+                    {step.label}
+                  </span>
+                </span>
+              </motion.button>
+            </div>
+          );
+        })}
+      </div>
     </nav>
   );
 }

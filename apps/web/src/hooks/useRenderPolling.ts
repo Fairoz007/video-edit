@@ -10,6 +10,7 @@ interface ProjectJson {
   stage?: string;
   message?: string;
   outputPath?: string;
+  outputPaths?: string[];
   script?: Parameters<ReturnType<typeof useProjectStore.getState>['setScript']>[0];
   keywords?: { keywords: string[] };
   media?: unknown[];
@@ -29,6 +30,7 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
         setProgress,
         setStatus,
         setOutputPath,
+        setOutputPaths,
         setScript,
         setKeywords,
         setMedia,
@@ -47,7 +49,9 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
         if (data.timeline) setTimeline(data.timeline);
         if (data.input) setInput(data.input);
 
-        if (data.outputPath) {
+        if (Array.isArray(data.outputPaths) && data.outputPaths.length) {
+          setOutputPaths(data.outputPaths);
+        } else if (data.outputPath) {
           setOutputPath(data.outputPath);
         }
 

@@ -35,6 +35,7 @@ import {
   defaultMusicVolume,
 } from '../utils/backgroundMusic.js';
 import { RenderCancelledError } from './renderErrors.js';
+import { splitVideoIntoShortParts } from '../utils/splitVideo.js';
 
 export class RenderPipeline {
   constructor(root) {
@@ -168,6 +169,20 @@ export class RenderPipeline {
 
     try {
       this._assertNotCancelled(projectId);
+
+      const exportFullAndShorts = Boolean(options.exportFullAndShorts);
+      const autoShortsOnly =
+        Boolean(options.autoYouTubeShorts) && !exportFullAndShorts;
+      const includeShorts = exportFullAndShorts || autoShortsOnly;
+      const mainTemplateId = project.input?.templateId;
+      const shortsTemplateId =
+        options.shortsTemplateId || 'template_youtube_shorts';
+      const mainPreset = options.preset || '1080p';
+
+      project.exportFullAndShorts = exportFullAndShorts;
+      project.autoYouTubeShorts = includeShorts;
+      project.shortsTemplateId = shortsTemplateId;
+
       // 1. Script
       const uploadedScript = Boolean(project.input?.scriptText?.trim());
       report(
@@ -306,190 +321,325 @@ export class RenderPipeline {
         fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
       }
 
-      const templateId = project.input?.templateId;
-      const introGraphicSec = getIntroGraphicSec(templateId);
-
       const videoStyle = project.input?.videoStyle || 'documentary';
       project.videoStyle = videoStyle;
-
-      // 6. Timeline — documentary or walkthrough (Stitch-style slides)
-      report('timeline', 50, `Building ${videoStyle} timeline...`);
-      let timeline;
-      let walkthrough;
-      if (videoStyle === 'walkthrough') {
-        walkthrough = buildWalkthroughTimeline(script, media, {
-          audioDurationSec: effectiveNarrationSec,
-        });
-        project.walkthrough = walkthrough;
-        timeline = {
-          scenes: walkthrough.screens.map((s) => ({
-            id: s.id,
-            duration: s.duration,
-            trimStart: s.trimStart || 0,
-            trimEnd: s.trimEnd || 0,
-            playbackRate: s.playbackRate || 1,
-            loop: Boolean(s.loop),
-            audioVolume: s.audioVolume || 0,
-            media: { localPath: s.src, type: s.type },
-            transition: s.transition,
-          })),
-          totalDuration: walkthrough.totalDuration,
-        };
-      } else {
-        const docTemplate = getDocumentaryTemplate(templateId);
-        const visualTheme = resolveVisualTheme(docTemplate);
-        project.visualTemplate = docTemplate;
-        timeline = buildTimeline(script, media, tracks, {
-          audioDurationSec: effectiveNarrationSec,
-          videoOnly,
-          editMode: project.input?.editMode,
-          templateId: docTemplate.id,
-          visualTheme,
-          introGraphicSec,
-        });
-        if (timeline.sections?.length) {
-          script.sections = timeline.sections;
-          project.script = script;
-        }
-      }
-      project.timeline = timeline;
-      fs.mkdirSync(path.join(dir, 'timeline'), { recursive: true });
-      fs.writeFileSync(path.join(dir, 'timeline', 'timeline.json'), JSON.stringify(timeline, null, 2));
-
-      // 5. Subtitles — after timeline; intro offset matches template (audio starts after intro)
-      if (videoOnly) {
-        report('subtitles', 45, 'Skipped — video-only edit');
-        project.subtitleCues = [];
-        project.wordCues = [];
-      } else {
-        report('subtitles', 45, 'Creating animated subtitle cues...');
-        const subtitleSections = syncSectionDurationsFromAudio(
-          script.sections,
-          effectiveNarrationSec,
-        );
-        const { cues, wordCues } = writeSubtitles(subtitleSections, path.join(dir, 'subtitles'), {
-          templateId: templateId || getDocumentaryTemplate().id,
-          introOffsetSec: introGraphicSec,
-          audioDurationSec: effectiveNarrationSec,
-        });
-        project.subtitleCues = cues;
-        project.wordCues = wordCues;
-      }
-      if (walkthrough) {
-        fs.writeFileSync(
-          path.join(dir, 'timeline', 'walkthrough.json'),
-          JSON.stringify(walkthrough, null, 2),
-        );
-      }
-
-      // 7. Remotion — TransitionSeries, walkthrough slides, motion graphics
-      const compositionId = videoStyle === 'walkthrough' ? 'Walkthrough' : 'Documentary';
-      report('remotion', 55, `Rendering with Remotion (${compositionId})...`);
-      const remotionProps = buildRemotionProps({
-        ...project,
-        timeline,
-        walkthrough,
-        subtitleCues: project.subtitleCues,
-        wordCues: project.wordCues,
-      });
-      let videoPath = path.join(dir, 'renders', 'remotion-output.mp4');
-      fs.mkdirSync(path.dirname(videoPath), { recursive: true });
-      try {
-        await renderRemotionPreview(remotionProps, videoPath, {
-          publicDir: path.join(dir, 'remotion-public'),
-          compositionId,
-          renderJob,
-        });
-      } catch (err) {
-        if (err instanceof RenderCancelledError || renderJob.cancelled) {
-          throw err;
-        }
-        console.warn('[Pipeline] Remotion failed, falling back to MoviePy:', err.message);
-        this._assertNotCancelled(projectId);
-        report('moviepy', 58, 'MoviePy clip sequencing...');
-        const moviepyScenes = await prepareMoviePyScenes(timeline.scenes);
-        if (!moviepyScenes.length) {
-          throw new Error('No valid media clips for MoviePy — check scraped/downloaded assets');
-        }
-        const moviepyConfig = {
-          scenes: moviepyScenes,
-          ...(combinedPath ? { audio: combinedPath } : {}),
-          output: path.join(dir, 'renders', 'moviepy-output.mp4'),
-          fps: 30,
-          resolution: options.preset || '1080p',
-        };
-        fs.writeFileSync(path.join(dir, 'moviepy-config.json'), JSON.stringify(moviepyConfig, null, 2));
-        videoPath = path.join(dir, 'renders', 'moviepy-output.mp4');
-        await runMoviePyPipeline(
-          path.join(dir, 'moviepy-config.json'),
-          (p) => report('moviepy', 58 + p * 0.12, 'MoviePy rendering...'),
-          renderJob,
-        );
-      }
-
-      if (!(await verifyVideoFile(videoPath))) {
-        throw new Error('Video render failed — intermediate file is invalid');
-      }
 
       const musicPath = resolveBackgroundMusicPath(this.root, {
         explicitPath: options.musicPath,
         projectId,
       });
-      const theme = project.visualTemplate
-        ? resolveVisualTheme(project.visualTemplate)
-        : resolveVisualTheme(getDocumentaryTemplate(project.input?.templateId));
-      const musicVolume =
-        options.musicVolume ??
-        options.ducking ??
-        theme?.musicDuckLevel ??
-        defaultMusicVolume();
 
-      if (musicPath) {
-        project.backgroundMusic = {
-          path: musicPath,
-          filename: path.basename(musicPath),
-          volume: musicVolume,
-        };
-        fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
-      }
-
-      report(
-        'ffmpeg',
-        82,
-        musicPath
-          ? `Final export (mixing ${path.basename(musicPath)} at ${Math.round(musicVolume * 100)}% under narration)...`
-          : 'Final export (mix audio + encode)...',
-      );
-      const slug = script.topic.replace(/[^a-z0-9]+/gi, '-').slice(0, 36);
-      const exportName = `${slug}-${Date.now()}.${options.format || 'mp4'}`;
-      const finalPath = path.join(this.root, 'exports', exportName);
-      fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-
-      if (videoOnly) {
-        await exportVideoOnly({
-          videoPath,
-          outputPath: finalPath,
-          preset: options.preset || '1080p',
-          cinematic: true,
-          musicPath,
-          ducking: musicVolume,
+      const variants = [];
+      if (videoStyle === 'walkthrough' || !includeShorts) {
+        variants.push({
+          key: 'full',
+          templateId: mainTemplateId,
+          preset: mainPreset,
+          splitShorts: false,
+          suffix: 'full',
+        });
+      } else if (exportFullAndShorts) {
+        variants.push({
+          key: 'full',
+          templateId: mainTemplateId,
+          preset: mainPreset,
+          splitShorts: false,
+          suffix: 'full',
+        });
+        variants.push({
+          key: 'shorts',
+          templateId: shortsTemplateId,
+          preset: 'shorts',
+          splitShorts: true,
+          suffix: 'shorts',
         });
       } else {
-        await exportDocumentary({
-          videoPath,
-          narrationPath: combinedPath,
-          outputPath: finalPath,
-          musicPath,
-          preset: options.preset || '1080p',
-          ducking: musicVolume,
-          cinematic: true,
+        variants.push({
+          key: 'shorts',
+          templateId: shortsTemplateId,
+          preset: 'shorts',
+          splitShorts: true,
+          suffix: 'shorts',
         });
+      }
+
+      const shortsMaxSec = Number(options.shortsMaxDurationSec) || 90;
+      const exportFormat = options.format || 'mp4';
+      const slug = script.topic.replace(/[^a-z0-9]+/gi, '-').slice(0, 36);
+      const exportDir = path.join(this.root, 'exports');
+      fs.mkdirSync(exportDir, { recursive: true });
+      const exportTs = Date.now();
+
+      const allOutputPaths = [];
+      const fullOutputPaths = [];
+      const shortsOutputPaths = [];
+      const compositionId = videoStyle === 'walkthrough' ? 'Walkthrough' : 'Documentary';
+
+      for (let vi = 0; vi < variants.length; vi++) {
+        const variant = variants[vi];
+        const progressLo = 50 + (vi / variants.length) * 42;
+        const progressHi = 50 + ((vi + 1) / variants.length) * 42;
+        const variantLabel =
+          variant.key === 'shorts' ? 'YouTube Shorts' : 'full documentary';
+
+        project.renderTemplateId = variant.templateId;
+        project.renderPreset = variant.preset;
+
+        const templateId = variant.templateId;
+        const introGraphicSec = getIntroGraphicSec(templateId);
+
+        report(
+          'timeline',
+          progressLo,
+          `Building ${videoStyle} timeline (${variantLabel})...`,
+        );
+        let timeline;
+        let walkthrough;
+        if (videoStyle === 'walkthrough') {
+          walkthrough = buildWalkthroughTimeline(script, media, {
+            audioDurationSec: effectiveNarrationSec,
+          });
+          project.walkthrough = walkthrough;
+          timeline = {
+            scenes: walkthrough.screens.map((s) => ({
+              id: s.id,
+              duration: s.duration,
+              trimStart: s.trimStart || 0,
+              trimEnd: s.trimEnd || 0,
+              playbackRate: s.playbackRate || 1,
+              loop: Boolean(s.loop),
+              audioVolume: s.audioVolume || 0,
+              media: { localPath: s.src, type: s.type },
+              transition: s.transition,
+            })),
+            totalDuration: walkthrough.totalDuration,
+          };
+        } else {
+          const docTemplate = getDocumentaryTemplate(templateId);
+          const visualTheme = resolveVisualTheme(docTemplate);
+          project.visualTemplate = docTemplate;
+          timeline = buildTimeline(script, media, tracks, {
+            audioDurationSec: effectiveNarrationSec,
+            videoOnly,
+            editMode: project.input?.editMode,
+            templateId: docTemplate.id,
+            visualTheme,
+            introGraphicSec,
+          });
+          if (timeline.sections?.length) {
+            script.sections = timeline.sections;
+            project.script = script;
+          }
+        }
+        project.timeline = timeline;
+        fs.mkdirSync(path.join(dir, 'timeline'), { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, 'timeline', `timeline-${variant.suffix}.json`),
+          JSON.stringify(timeline, null, 2),
+        );
+        if (vi === variants.length - 1) {
+          fs.writeFileSync(
+            path.join(dir, 'timeline', 'timeline.json'),
+            JSON.stringify(timeline, null, 2),
+          );
+        }
+
+        let subtitleCues = [];
+        let wordCues = [];
+        if (videoOnly) {
+          report('subtitles', progressLo + 2, 'Skipped — video-only edit');
+        } else {
+          report('subtitles', progressLo + 2, `Subtitles (${variantLabel})...`);
+          const subtitleSections = syncSectionDurationsFromAudio(
+            script.sections,
+            effectiveNarrationSec,
+          );
+          const subtitleDir = path.join(dir, 'subtitles', variant.suffix);
+          const written = writeSubtitles(subtitleSections, subtitleDir, {
+            templateId: templateId || getDocumentaryTemplate().id,
+            introOffsetSec: introGraphicSec,
+            audioDurationSec: effectiveNarrationSec,
+          });
+          subtitleCues = written.cues;
+          wordCues = written.wordCues;
+        }
+        project.subtitleCues = subtitleCues;
+        project.wordCues = wordCues;
+
+        if (walkthrough) {
+          fs.writeFileSync(
+            path.join(dir, 'timeline', 'walkthrough.json'),
+            JSON.stringify(walkthrough, null, 2),
+          );
+        }
+
+        report(
+          'remotion',
+          progressLo + 5,
+          `Remotion render (${variantLabel})...`,
+        );
+        const remotionProps = buildRemotionProps({
+          ...project,
+          timeline,
+          walkthrough,
+          subtitleCues,
+          wordCues,
+        });
+        let videoPath = path.join(dir, 'renders', `remotion-${variant.suffix}.mp4`);
+        fs.mkdirSync(path.dirname(videoPath), { recursive: true });
+        try {
+          await renderRemotionPreview(remotionProps, videoPath, {
+            publicDir: path.join(dir, `remotion-public-${variant.suffix}`),
+            compositionId,
+            renderJob,
+          });
+        } catch (err) {
+          if (err instanceof RenderCancelledError || renderJob.cancelled) {
+            throw err;
+          }
+          console.warn(
+            `[Pipeline] Remotion failed (${variant.key}), falling back to MoviePy:`,
+            err.message,
+          );
+          this._assertNotCancelled(projectId);
+          report('moviepy', progressLo + 8, `MoviePy (${variantLabel})...`);
+          const moviepyScenes = await prepareMoviePyScenes(timeline.scenes);
+          if (!moviepyScenes.length) {
+            throw new Error(
+              'No valid media clips for MoviePy — check scraped/downloaded assets',
+            );
+          }
+          const moviepyConfig = {
+            scenes: moviepyScenes,
+            ...(combinedPath ? { audio: combinedPath } : {}),
+            output: path.join(dir, 'renders', `moviepy-${variant.suffix}.mp4`),
+            fps: 30,
+            resolution: variant.preset,
+          };
+          fs.writeFileSync(
+            path.join(dir, `moviepy-config-${variant.suffix}.json`),
+            JSON.stringify(moviepyConfig, null, 2),
+          );
+          videoPath = path.join(dir, 'renders', `moviepy-${variant.suffix}.mp4`);
+          await runMoviePyPipeline(
+            path.join(dir, `moviepy-config-${variant.suffix}.json`),
+            (p) =>
+              report(
+                'moviepy',
+                progressLo + 8 + p * 0.12,
+                `MoviePy (${variantLabel})...`,
+              ),
+            renderJob,
+          );
+        }
+
+        if (!(await verifyVideoFile(videoPath))) {
+          throw new Error(`Video render failed (${variant.key}) — output invalid`);
+        }
+
+        const theme = resolveVisualTheme(getDocumentaryTemplate(templateId));
+        const musicVolume =
+          options.musicVolume ??
+          options.ducking ??
+          theme?.musicDuckLevel ??
+          defaultMusicVolume();
+
+        if (musicPath && vi === 0) {
+          project.backgroundMusic = {
+            path: musicPath,
+            filename: path.basename(musicPath),
+            volume: musicVolume,
+          };
+          fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+        }
+
+        const encodeTarget = variant.splitShorts
+          ? path.join(dir, 'renders', `export-${variant.suffix}.${exportFormat}`)
+          : path.join(exportDir, `${slug}-${exportTs}-${variant.key}.${exportFormat}`);
+
+        report(
+          'ffmpeg',
+          progressHi - 4,
+          variant.splitShorts
+            ? `Export Shorts 9:16 (${variantLabel})...`
+            : musicPath
+              ? `Export ${variantLabel} (mix audio)...`
+              : `Export ${variantLabel}...`,
+        );
+        fs.mkdirSync(path.dirname(encodeTarget), { recursive: true });
+
+        if (videoOnly) {
+          await exportVideoOnly({
+            videoPath,
+            outputPath: encodeTarget,
+            preset: variant.preset,
+            cinematic: true,
+            musicPath,
+            ducking: musicVolume,
+          });
+        } else {
+          await exportDocumentary({
+            videoPath,
+            narrationPath: combinedPath,
+            outputPath: encodeTarget,
+            preset: variant.preset,
+            musicPath,
+            ducking: musicVolume,
+            cinematic: true,
+          });
+        }
+
+        if (variant.splitShorts) {
+          this._assertNotCancelled(projectId);
+          report(
+            'shorts',
+            progressHi - 1,
+            `Splitting Shorts (≤${shortsMaxSec}s each)...`,
+          );
+          const shortBase = `${slug}-${exportTs}-short`;
+          const parts = await splitVideoIntoShortParts(
+            encodeTarget,
+            exportDir,
+            shortBase,
+            shortsMaxSec,
+          );
+          try {
+            fs.unlinkSync(encodeTarget);
+          } catch {
+            /* temp vertical master */
+          }
+          shortsOutputPaths.push(...parts);
+          allOutputPaths.push(...parts);
+        } else {
+          fullOutputPaths.push(encodeTarget);
+          allOutputPaths.push(encodeTarget);
+        }
+      }
+
+      if (includeShorts) {
+        project.shortsMaxDurationSec = shortsMaxSec;
+        project.shortsPartCount = shortsOutputPaths.length;
+      }
+      if (fullOutputPaths.length) {
+        project.fullOutputPath = fullOutputPaths[0];
+      }
+      if (shortsOutputPaths.length) {
+        project.shortsOutputPaths = shortsOutputPaths;
       }
 
       project.status = 'completed';
-      project.outputPath = finalPath;
+      project.outputPath = allOutputPaths[0];
+      project.outputPaths = allOutputPaths;
       project.completedAt = new Date().toISOString();
-      report('done', 100, 'Export complete!');
+
+      let doneMessage = 'Export complete!';
+      if (exportFullAndShorts && fullOutputPaths.length && shortsOutputPaths.length) {
+        doneMessage = `Export complete — full video + ${shortsOutputPaths.length} Short part${shortsOutputPaths.length === 1 ? '' : 's'}`;
+      } else if (shortsOutputPaths.length) {
+        doneMessage = `Export complete — ${shortsOutputPaths.length} Short${shortsOutputPaths.length === 1 ? '' : 's'} ready`;
+      }
+
+      report('done', 100, doneMessage);
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
 
       return project;

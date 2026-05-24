@@ -78,8 +78,8 @@ const documentaryMetadata: CalculateMetadataFunction<DocumentaryProps> = ({ prop
   return {
     durationInFrames: Math.max(fps * 10, durationInFrames),
     fps,
-    width: 1920,
-    height: 1080,
+    width: p.width || 1920,
+    height: p.height || 1080,
   };
 };
 
