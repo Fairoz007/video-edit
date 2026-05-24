@@ -27,6 +27,7 @@ export interface VisualTheme {
     lightLeakHue?: number;
     accentShapes?: boolean;
     motionBlur?: boolean;
+    pulseVignette?: boolean;
   };
   cornerBrackets:
     | boolean

@@ -33,7 +33,16 @@ export const EffectsLayer: React.FC = () => {
   const filmGrain = effects.filmGrain ?? theme.filmGrain ?? 0;
   const chromatic = effects.chromaticAberration ?? theme.chromaticAberration;
   const glitch = effects.glitchIntensity ?? theme.glitchIntensity ?? 0;
+  const pulseVignette = Boolean(effects.pulseVignette);
   const accent = hexToRgb(theme.palette.primary);
+  const vignetteStrength = effects.vignette ?? theme.vignette ?? 0.35;
+  const pulseVignetteOpacity = pulseVignette
+    ? vignetteStrength *
+      interpolate(frame % 90, [0, 45, 90], [0.85, 1.15, 0.85], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+    : vignetteStrength;
   const leakOpacity = interpolate(
     frame % 180,
     [0, 20, 70, 120, 180],
@@ -116,6 +125,15 @@ export const EffectsLayer: React.FC = () => {
             boxShadow:
               'inset 5px 0 rgba(255,0,80,0.35), inset -5px 0 rgba(0,245,255,0.30)',
             mixBlendMode: 'screen',
+          }}
+        />
+      )}
+
+      {pulseVignetteOpacity > 0 && (
+        <AbsoluteFill
+          style={{
+            background: `radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,${Math.min(0.92, pulseVignetteOpacity)}) 100%)`,
+            mixBlendMode: 'multiply',
           }}
         />
       )}

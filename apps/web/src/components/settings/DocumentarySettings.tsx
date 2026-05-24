@@ -92,10 +92,10 @@ export function DocumentarySettings() {
       </SettingsField>
 
       <SettingsField
-        label="Visual template"
+        label="Full video template (16:9)"
         hint={
           DOCUMENTARY_VISUAL_TEMPLATES.find((t) => t.id === templateId)?.description ||
-          'Choose a look in Templates for previews.'
+          'Long-form look — transitions, effects, intro/outro. Shorts use a separate template in Export.'
         }
       >
         <select
