@@ -133,6 +133,12 @@ export const restartRender = (payload: {
   options?: ExportOptions;
 }) => api.post('/render/restart', payload);
 
+export const resumeRender = (payload: {
+  projectId: string;
+  input?: DocumentaryInput;
+  options?: ExportOptions;
+}) => api.post(`/render/resume/${payload.projectId}`, payload);
+
 export const getLatestExport = () =>
   api.get<{ filename: string | null; outputPath: string | null; size?: number }>(
     '/exports/latest',
@@ -172,6 +178,8 @@ export interface ExportOptions {
   shortsTemplateId?: string;
   /** Max seconds per Short part (YouTube limit is 90). */
   shortsMaxDurationSec?: number;
+  /** Faster Remotion (disables motion blur). */
+  fastRender?: boolean;
   musicPath?: string;
   voice?: string;
   rate?: number;

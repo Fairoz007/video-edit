@@ -17,9 +17,11 @@ export interface ProjectState {
   exportOptions: ExportOptions;
   voiceSettings: { voice: string; rate: number; pitch: number };
   errorMessage: string | null;
+  canResume: boolean;
 
   setInput: (input: Partial<DocumentaryInput>) => void;
   setError: (message: string | null) => void;
+  setCanResume: (canResume: boolean) => void;
   setProjectId: (id: string | null) => void;
   setScript: (script: ProjectState['script']) => void;
   setKeywords: (kw: ProjectState['keywords']) => void;
@@ -60,12 +62,15 @@ export const useProjectStore = create<ProjectState>((set) => ({
     exportFullAndShorts: false,
     shortsTemplateId: 'template_youtube_shorts',
     shortsMaxDurationSec: 90,
+    fastRender: false,
   },
   voiceSettings: { voice: '', rate: 175, pitch: 0 },
   errorMessage: null,
+  canResume: false,
 
   setInput: (input) => set((s) => ({ input: { ...s.input, ...input } })),
   setError: (errorMessage) => set({ errorMessage }),
+  setCanResume: (canResume) => set({ canResume }),
   setProjectId: (id) => set({ projectId: id }),
   setScript: (script) => set({ script }),
   setKeywords: (keywords) => set({ keywords }),
@@ -98,5 +103,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
       outputPath: null,
       outputPaths: null,
       errorMessage: null,
+      canResume: false,
     }),
 }));

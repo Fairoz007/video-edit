@@ -88,7 +88,8 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
   const needsLoop =
     Boolean(scene.loop) ||
     (playableSec != null && timelineSec > playableSec / playbackRate + 0.08);
-  const videoTimeoutMs = 120_000;
+  /** 10 min — stock clips + high concurrency can exceed the old 120s default */
+  const videoTimeoutMs = 600_000;
 
   return (
     <AbsoluteFill style={{ backgroundColor: theme.palette.background }}>

@@ -18,8 +18,14 @@ const STAGES = [
 ];
 
 export function RenderProgress() {
-  const { progress, stage, message, status, outputPath, outputPaths } = useProjectStore();
-  const { cancelRenderFlow, restartRenderFlow } = useDocumentaryPipeline();
+  const { progress, stage, message, status, outputPath, outputPaths, projectId, canResume } =
+    useProjectStore();
+  const { cancelRenderFlow, restartRenderFlow, resumeRenderFlow } = useDocumentaryPipeline();
+  const showResume =
+    Boolean(projectId) &&
+    canResume &&
+    status !== 'completed' &&
+    (status === 'idle' || status === 'failed' || stage === 'remotion' || stage === 'cancelled');
   const stageIndex = STAGES.indexOf(stage);
   const isRendering = status === 'rendering';
   const wasStopped = stage === 'cancelled' && status === 'idle';
@@ -62,6 +68,16 @@ export function RenderProgress() {
               >
                 <Square className="w-3.5 h-3.5" />
                 Stop render
+              </button>
+            )}
+            {showResume && (
+              <button
+                type="button"
+                onClick={() => resumeRenderFlow()}
+                className="flex-1 py-2 px-3 rounded-studio text-xs font-semibold border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Resume
               </button>
             )}
             <button

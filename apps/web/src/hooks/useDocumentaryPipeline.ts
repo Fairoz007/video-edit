@@ -9,7 +9,9 @@ import {
   getProject,
   scrapeUrlFull,
   cancelRender,
+  getRenderStatus,
   restartRender,
+  resumeRender,
   startRender,
 } from '../utils/api';
 import { formatBackendUnreachableMessage } from '../utils/apiBase';
@@ -26,6 +28,9 @@ function applyTimelineToStore(
   timeline: TimelineResult,
 ) {
   store.setTimeline(timeline);
+  if (timeline.templateId) {
+    store.setInput({ templateId: timeline.templateId });
+  }
   if (timeline.sections?.length) {
     store.setScript({ ...script, sections: timeline.sections });
   }
@@ -93,6 +98,9 @@ export function useDocumentaryPipeline() {
           String(project.stage || ''),
           String(project.message || ''),
         );
+      }
+      if (typeof project.canResume === 'boolean') {
+        store.setCanResume(project.canResume);
       }
       const st = project.status as string;
       const prog = typeof project.progress === 'number' ? project.progress : 0;
@@ -216,12 +224,59 @@ export function useDocumentaryPipeline() {
     try {
       await cancelRender(projectId);
       store.setStatus('idle');
-      store.setProgress(0, 'cancelled', 'Render stopped');
+      store.setProgress(0, 'cancelled', 'Render stopped — click Resume to continue');
+      store.setCanResume(true);
       store.setError(null);
+      const { data } = await getRenderStatus(projectId);
+      if (typeof data.canResume === 'boolean') store.setCanResume(data.canResume);
     } catch (e) {
       store.setError(formatApiError(e));
     }
   }, [store]);
+
+  const resumeRenderFlow = useCallback(async () => {
+    const state = useProjectStore.getState();
+    if (!state.projectId) {
+      store.setError('No project to resume — start a render first.');
+      return;
+    }
+
+    store.setError(null);
+    store.setStatus('rendering');
+    store.setProgress(state.progress || 50, 'remotion', 'Resuming render from last checkpoint…');
+
+    try {
+      const input = normalizedInput();
+      const { voiceSettings, exportOptions, projectId } = state;
+      const editMode = input.editMode || 'with-narration';
+      const { data } = await resumeRender({
+        projectId,
+        input: {
+          ...input,
+          editMode,
+          voice: voiceSettings.voice,
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+        },
+        options: {
+          ...exportOptions,
+          templateId: input.templateId,
+          editMode,
+          videoOnly: editMode === 'video-only',
+          voice: voiceSettings.voice,
+          rate: voiceSettings.rate,
+          pitch: voiceSettings.pitch,
+          resume: true,
+          fastRender: Boolean(exportOptions.fastRender),
+        },
+      });
+      store.setProjectId(data.projectId);
+      store.setCanResume(false);
+    } catch (e) {
+      store.setStatus('failed');
+      store.setError(formatApiError(e));
+    }
+  }, [validateInput, normalizedInput, store]);
 
   const restartRenderFlow = useCallback(async () => {
     const state = useProjectStore.getState();
@@ -259,11 +314,13 @@ export function useDocumentaryPipeline() {
         },
         options: {
           ...exportOptions,
+          templateId: input.templateId,
           editMode,
           videoOnly: editMode === 'video-only',
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
           pitch: voiceSettings.pitch,
+          fastRender: Boolean(exportOptions.fastRender),
         },
       });
       store.setProjectId(data.projectId);
@@ -309,11 +366,13 @@ export function useDocumentaryPipeline() {
         },
         options: {
           ...exportOptions,
+          templateId: input.templateId,
           editMode,
           videoOnly: editMode === 'video-only',
           voice: voiceSettings.voice,
           rate: voiceSettings.rate,
           pitch: voiceSettings.pitch,
+          fastRender: Boolean(exportOptions.fastRender),
         },
       });
       store.setProjectId(data.projectId);
@@ -371,6 +430,7 @@ export function useDocumentaryPipeline() {
     startRenderFlow,
     cancelRenderFlow,
     restartRenderFlow,
+    resumeRenderFlow,
     rebuildTimelineFlow,
     loadProject,
     saveProject,

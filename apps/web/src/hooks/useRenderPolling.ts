@@ -11,6 +11,7 @@ interface ProjectJson {
   message?: string;
   outputPath?: string;
   outputPaths?: string[];
+  canResume?: boolean;
   script?: Parameters<ReturnType<typeof useProjectStore.getState>['setScript']>[0];
   keywords?: { keywords: string[] };
   media?: unknown[];
@@ -35,8 +36,8 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
         setKeywords,
         setMedia,
         setTimeline,
-        setInput,
         setError,
+        setCanResume,
       } = useProjectStore.getState();
 
       try {
@@ -47,7 +48,8 @@ export function useRenderPolling(projectId: string | null, enabled: boolean) {
         if (data.keywords) setKeywords(data.keywords);
         if (Array.isArray(data.media)) setMedia(normalizeMediaList(data.media));
         if (data.timeline) setTimeline(data.timeline);
-        if (data.input) setInput(data.input);
+        // Do not overwrite documentary/export choices while rendering — server project.json is stale.
+        if (typeof data.canResume === 'boolean') setCanResume(data.canResume);
 
         if (Array.isArray(data.outputPaths) && data.outputPaths.length) {
           setOutputPaths(data.outputPaths);

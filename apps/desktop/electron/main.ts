@@ -262,14 +262,13 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('console-message', (_e, _level, message) => {
-    if (message.includes('Error') || message.includes('error')) {
+    if (message.includes('Error') || message.includes('SyntaxError')) {
       console.error('[DocuForge UI]', message);
     }
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    void loadDevUi();
   } else {
     loadProductionUi(false);
   }
@@ -280,6 +279,20 @@ function createWindow() {
 }
 
 async function bootstrapBackend() {
+  if (isDev) {
+    const ok = await waitForBackend(120, 500);
+    if (!ok) {
+      console.warn(
+        '[DocuForge] Dev: API not on port',
+        BACKEND_PORT,
+        '— run npm run dev from repo root (do not start Electron alone)',
+      );
+    } else {
+      backendReady = true;
+    }
+    return;
+  }
+
   const alreadyUp = await waitForBackend(4, 200);
   if (!alreadyUp) {
     const started = startBackend();
@@ -297,8 +310,33 @@ async function bootstrapBackend() {
     backendReady = true;
   }
 
-  if (!mainWindow || isDev) return;
+  if (!mainWindow) return;
   loadProductionUi(true);
+}
+
+async function waitForVite(maxAttempts = 60, intervalMs = 500): Promise<boolean> {
+  const url = 'http://127.0.0.1:5173/';
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return true;
+    } catch {
+      /* vite still starting */
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+async function loadDevUi() {
+  if (!mainWindow) return;
+  await bootstrapBackend();
+  const viteOk = await waitForVite();
+  if (!viteOk) {
+    console.warn('[DocuForge] Vite dev server not ready on :5173');
+  }
+  await mainWindow.loadURL('http://127.0.0.1:5173');
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
 app.whenReady().then(() => {
@@ -310,12 +348,14 @@ app.whenReady().then(() => {
   }
 
   createWindow();
-  void bootstrapBackend();
+  if (!isDev) {
+    void bootstrapBackend();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
-      void bootstrapBackend();
+      if (!isDev) void bootstrapBackend();
     }
   });
 });

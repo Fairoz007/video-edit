@@ -24,11 +24,12 @@ function resolveContentDuration(script, audioDurationSec) {
 
 
 function expandMediaPool(manifest, minClips) {
-  if (!manifest.length) return [];
-  if (manifest.length >= minClips) return manifest;
-  const out = [...manifest];
+  const list = Array.isArray(manifest) ? manifest : [];
+  if (!list.length) return [];
+  if (list.length >= minClips) return list;
+  const out = [...list];
   while (out.length < minClips) {
-    out.push(manifest[out.length % manifest.length]);
+    out.push(list[out.length % list.length]);
   }
   return out;
 }
@@ -186,6 +187,12 @@ function maxClipsForTemplate(templateId) {
 }
 
 export function buildTimeline(script, mediaManifest, audioTracks, options = {}) {
+  if (!script?.sections?.length) {
+    throw new Error(
+      'Documentary script has no sections — add [opening], [introduction], etc., or regenerate the script.',
+    );
+  }
+
   const videoOnly =
     options.videoOnly === true || options.editMode === 'video-only';
   const visualTheme = options.visualTheme || null;

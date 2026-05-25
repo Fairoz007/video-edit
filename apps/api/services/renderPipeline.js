@@ -36,6 +36,20 @@ import {
 } from '../utils/backgroundMusic.js';
 import { RenderCancelledError } from './renderErrors.js';
 import { splitVideoIntoShortParts } from '../utils/splitVideo.js';
+import {
+  clearCheckpoint,
+  findNarrationAudioPath,
+  hasPrepArtifacts,
+  inferCheckpointFromDisk,
+  isStepDone,
+  loadCheckpoint,
+  loadSubtitlesFromDisk,
+  markStep,
+  mergeCheckpoints,
+  saveCheckpoint,
+  snapshotCheckpointFromDisk,
+  variantStep,
+} from '../utils/renderCheckpoint.js';
 
 export class RenderPipeline {
   constructor(root) {
@@ -75,14 +89,17 @@ export class RenderPipeline {
   }
 
   _markProjectCancelled(projectId) {
-    const projectPath = path.join(projectDir(this.root, projectId), 'project.json');
+    const dir = projectDir(this.root, projectId);
+    const projectPath = path.join(dir, 'project.json');
     if (!fs.existsSync(projectPath)) return false;
     const project = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
     if (project.status === 'completed') return false;
     project.status = 'cancelled';
     project.stage = 'cancelled';
-    project.message = 'Render stopped';
+    project.message = 'Render stopped — use Resume to continue from Remotion';
     project.cancelledAt = new Date().toISOString();
+    project.canResume = hasPrepArtifacts(dir, project.input?.editMode === 'video-only');
+    project.resumeAvailable = project.canResume;
     delete project.error;
     fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
     return true;
@@ -91,6 +108,11 @@ export class RenderPipeline {
   cancelRender(projectId) {
     const job = this.jobs.get(projectId);
     if (job) job.cancel();
+    try {
+      snapshotCheckpointFromDisk(projectDir(this.root, projectId));
+    } catch {
+      /* best-effort */
+    }
     return this._markProjectCancelled(projectId) || Boolean(job);
   }
 
@@ -132,11 +154,47 @@ export class RenderPipeline {
     return project;
   }
 
+  _hydrateFromDisk(project, dir) {
+    const scriptPath = path.join(dir, 'script.json');
+    if (!project.script && fs.existsSync(scriptPath)) {
+      project.script = JSON.parse(fs.readFileSync(scriptPath, 'utf8'));
+    }
+    const mediaManifest = path.join(dir, 'media', 'manifest.json');
+    if (!project.media?.length && fs.existsSync(mediaManifest)) {
+      project.media = JSON.parse(fs.readFileSync(mediaManifest, 'utf8'));
+    }
+    const narrationPath =
+      project.narration?.combinedPath || findNarrationAudioPath(dir);
+    if (narrationPath) {
+      project.narration = { ...(project.narration || {}), combinedPath: narrationPath };
+    }
+    return project;
+  }
+
+  async runResumePipeline(projectId, options = {}, onProgress) {
+    return this.runFullPipeline(projectId, { ...options, resume: true }, onProgress);
+  }
+
   async runFullPipeline(projectId, options = {}, onProgress) {
     const dir = projectDir(this.root, projectId);
     const projectPath = path.join(dir, 'project.json');
     const renderJob = this._beginJob(projectId);
+    const resume = Boolean(options.resume);
+    let checkpoint = loadCheckpoint(dir);
+    if (!resume) {
+      clearCheckpoint(dir);
+      checkpoint = loadCheckpoint(dir);
+    } else {
+      const inferred = inferCheckpointFromDisk(dir);
+      checkpoint = mergeCheckpoints(checkpoint, inferred);
+      saveCheckpoint(dir, {
+        completed: checkpoint.completed,
+        resumedAt: new Date().toISOString(),
+      });
+    }
+
     let project = this.loadOrCreateProject(projectId, options.input);
+    project = this._hydrateFromDisk(project, dir);
 
     if (options.input && typeof options.input === 'object') {
       project.input = { ...(project.input || {}), ...options.input };
@@ -147,6 +205,12 @@ export class RenderPipeline {
       project.input?.editMode === 'video-only' ||
       options.editMode === 'video-only' ||
       options.videoOnly === true;
+
+    project.resumeAvailable = hasPrepArtifacts(dir, videoOnly);
+    project.canResume = resume || project.resumeAvailable;
+    if (project.canResume) {
+      fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
+    }
 
     if (videoOnly) {
       project.input = { ...(project.input || {}), editMode: 'video-only' };
@@ -174,15 +238,55 @@ export class RenderPipeline {
       const autoShortsOnly =
         Boolean(options.autoYouTubeShorts) && !exportFullAndShorts;
       const includeShorts = exportFullAndShorts || autoShortsOnly;
-      const mainTemplateId = project.input?.templateId;
+      const mainTemplateId =
+        options.templateId || project.input?.templateId || 'template_cinematic_docuforge';
       const shortsTemplateId =
-        options.shortsTemplateId || 'template_youtube_shorts';
+        options.shortsTemplateId ||
+        project.shortsTemplateId ||
+        'template_youtube_shorts';
       const mainPreset = options.preset || '1080p';
 
       project.exportFullAndShorts = exportFullAndShorts;
       project.autoYouTubeShorts = includeShorts;
       project.shortsTemplateId = shortsTemplateId;
 
+      const scriptPath = path.join(dir, 'script.json');
+      const mediaManifestPath = path.join(dir, 'media', 'manifest.json');
+      const prepDone =
+        resume &&
+        (isStepDone(checkpoint, 'prep') || hasPrepArtifacts(dir, videoOnly)) &&
+        fs.existsSync(scriptPath);
+
+      let script;
+      let media;
+      let tracks = [];
+      let combinedPath = null;
+      let audioDurationSec = null;
+      let effectiveNarrationSec;
+
+      if (prepDone) {
+        report('script', 45, 'Resume — reusing script, media & narration from last run');
+        script = JSON.parse(fs.readFileSync(scriptPath, 'utf8'));
+        project.script = script;
+        let rawMedia = [];
+        if (fs.existsSync(mediaManifestPath)) {
+          rawMedia = JSON.parse(fs.readFileSync(mediaManifestPath, 'utf8'));
+        }
+        const mediaDir = path.join(dir, 'media');
+        media = await ensureMediaManifest(
+          await sanitizeMediaManifest(rawMedia),
+          mediaDir,
+          12,
+        );
+        project.media = media;
+        const narrationFile = findNarrationAudioPath(dir);
+        if (!videoOnly && narrationFile) {
+          combinedPath = narrationFile;
+          effectiveNarrationSec = estimateScriptDurationSec(script.sections);
+        } else {
+          effectiveNarrationSec = estimateScriptDurationSec(script.sections);
+        }
+      } else {
       // 1. Script
       const uploadedScript = Boolean(project.input?.scriptText?.trim());
       report(
@@ -190,9 +294,9 @@ export class RenderPipeline {
         5,
         uploadedScript ? 'Parsing uploaded script…' : 'Generating documentary script…',
       );
-      let script = await generateDocumentaryScript(project.input);
+      script = await generateDocumentaryScript(project.input);
       project.script = script;
-      fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
+      fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
 
       // 2. Playwright scrape (article / YouTube) — content + media for keywords & timeline
       const sourceUrl =
@@ -256,7 +360,7 @@ export class RenderPipeline {
         ...scrapedMedia.filter((m) => m.localPath),
         ...stockManifest,
       ];
-      let media = await sanitizeMediaManifest(manifest);
+      media = await sanitizeMediaManifest(manifest);
 
       // Recovery path: if a previous run already downloaded stock clips into media/manifest.json,
       // reuse them before falling back to placeholders.
@@ -282,16 +386,14 @@ export class RenderPipeline {
 
       media = await ensureMediaManifest(media, mediaDir, 12);
       project.media = media;
+      fs.writeFileSync(mediaManifestPath, JSON.stringify(project.media, null, 2));
       if (project.media.length < manifest.length) {
         console.warn(
           `[Pipeline] Dropped ${manifest.length - project.media.length} invalid media file(s)`,
         );
       }
 
-      let tracks = [];
-      let combinedPath = null;
-      let audioDurationSec = null;
-      let effectiveNarrationSec = estimateScriptDurationSec(script.sections);
+      effectiveNarrationSec = estimateScriptDurationSec(script.sections);
 
       // 4. Narration — length follows script; skipped in video-only edit mode
       if (videoOnly) {
@@ -319,6 +421,10 @@ export class RenderPipeline {
         script.sections = balanceSectionDurations(script.sections);
         project.script = script;
         fs.writeFileSync(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
+      }
+
+        markStep(dir, 'prep');
+        checkpoint = loadCheckpoint(dir);
       }
 
       const videoStyle = project.input?.videoStyle || 'documentary';
@@ -388,13 +494,37 @@ export class RenderPipeline {
         const templateId = variant.templateId;
         const introGraphicSec = getIntroGraphicSec(templateId);
 
+        const vSuffix = variant.suffix;
+        const timelinePath = path.join(dir, 'timeline', `timeline-${vSuffix}.json`);
+        const remotionPath = path.join(dir, 'renders', `remotion-${vSuffix}.mp4`);
+        const publicDir = path.join(dir, `remotion-public-${vSuffix}`);
+
+        let timeline;
+        let walkthrough;
+        let subtitleCues = [];
+        let wordCues = [];
+
+        let loadedCachedTimeline = false;
+        if (resume && isStepDone(checkpoint, variantStep(vSuffix, 'timeline')) && fs.existsSync(timelinePath)) {
+          const cached = JSON.parse(fs.readFileSync(timelinePath, 'utf8'));
+          const cachedTemplate = cached.templateId;
+          if (!cachedTemplate || cachedTemplate === templateId) {
+            timeline = cached;
+            project.timeline = timeline;
+            loadedCachedTimeline = true;
+            report('timeline', progressLo, `Resume — loaded timeline (${variantLabel})`);
+          } else {
+            console.warn(
+              `[Pipeline] Template changed (${cachedTemplate} → ${templateId}) — rebuilding timeline`,
+            );
+          }
+        }
+        if (!loadedCachedTimeline) {
         report(
           'timeline',
           progressLo,
           `Building ${videoStyle} timeline (${variantLabel})...`,
         );
-        let timeline;
-        let walkthrough;
         if (videoStyle === 'walkthrough') {
           walkthrough = buildWalkthroughTimeline(script, media, {
             audioDurationSec: effectiveNarrationSec,
@@ -415,6 +545,11 @@ export class RenderPipeline {
             totalDuration: walkthrough.totalDuration,
           };
         } else {
+          if (!Array.isArray(media) || !media.length) {
+            const mediaDir = path.join(dir, 'media');
+            media = await ensureMediaManifest([], mediaDir, 12);
+            project.media = media;
+          }
           const docTemplate = getDocumentaryTemplate(templateId);
           const visualTheme = resolveVisualTheme(docTemplate);
           project.visualTemplate = docTemplate;
@@ -443,18 +578,31 @@ export class RenderPipeline {
             JSON.stringify(timeline, null, 2),
           );
         }
+        markStep(dir, variantStep(vSuffix, 'timeline'));
+        checkpoint = loadCheckpoint(dir);
+        }
 
-        let subtitleCues = [];
-        let wordCues = [];
         if (videoOnly) {
           report('subtitles', progressLo + 2, 'Skipped — video-only edit');
+        } else if (
+          resume &&
+          isStepDone(checkpoint, variantStep(vSuffix, 'subtitles'))
+        ) {
+          const loaded = loadSubtitlesFromDisk(dir, vSuffix);
+          subtitleCues = loaded.cues;
+          wordCues = loaded.wordCues;
+          report(
+            'subtitles',
+            progressLo + 2,
+            `Resume — loaded subtitles (${variantLabel})`,
+          );
         } else {
           report('subtitles', progressLo + 2, `Subtitles (${variantLabel})...`);
           const subtitleSections = syncSectionDurationsFromAudio(
             script.sections,
             effectiveNarrationSec,
           );
-          const subtitleDir = path.join(dir, 'subtitles', variant.suffix);
+          const subtitleDir = path.join(dir, 'subtitles', vSuffix);
           const written = writeSubtitles(subtitleSections, subtitleDir, {
             templateId: templateId || getDocumentaryTemplate().id,
             introOffsetSec: introGraphicSec,
@@ -462,6 +610,8 @@ export class RenderPipeline {
           });
           subtitleCues = written.cues;
           wordCues = written.wordCues;
+          markStep(dir, variantStep(vSuffix, 'subtitles'));
+          checkpoint = loadCheckpoint(dir);
         }
         project.subtitleCues = subtitleCues;
         project.wordCues = wordCues;
@@ -473,10 +623,20 @@ export class RenderPipeline {
           );
         }
 
+        let videoPath = remotionPath;
+        fs.mkdirSync(path.dirname(videoPath), { recursive: true });
+
+        if (resume && isStepDone(checkpoint, variantStep(vSuffix, 'remotion')) && (await verifyVideoFile(remotionPath))) {
+          report(
+            'remotion',
+            progressLo + 8,
+            `Resume — using saved Remotion video (${variantLabel})`,
+          );
+        } else {
         report(
           'remotion',
           progressLo + 5,
-          `Remotion render (${variantLabel})...`,
+          `Remotion render (${variantLabel}) — can take several minutes…`,
         );
         const remotionProps = buildRemotionProps({
           ...project,
@@ -485,14 +645,27 @@ export class RenderPipeline {
           subtitleCues,
           wordCues,
         });
-        let videoPath = path.join(dir, 'renders', `remotion-${variant.suffix}.mp4`);
-        fs.mkdirSync(path.dirname(videoPath), { recursive: true });
+        const remotionProgressSpan = Math.max(8, (progressHi - progressLo) * 0.55);
         try {
           await renderRemotionPreview(remotionProps, videoPath, {
-            publicDir: path.join(dir, `remotion-public-${variant.suffix}`),
+            publicDir,
             compositionId,
             renderJob,
+            preservePublicDir: resume,
+            fastRender: Boolean(options.fastRender),
+            onProgress: ({ pct, elapsedSec, renderedFrames }) => {
+              const sub = progressLo + 5 + (remotionProgressSpan * pct) / 100;
+              const frameNote =
+                renderedFrames != null ? ` · ${renderedFrames} frames` : '';
+              report(
+                'remotion',
+                Math.min(progressHi - 2, sub),
+                `Remotion ${pct}% (${elapsedSec}s${frameNote}) — ${variantLabel}`,
+              );
+            },
           });
+          markStep(dir, variantStep(vSuffix, 'remotion'));
+          checkpoint = loadCheckpoint(dir);
         } catch (err) {
           if (err instanceof RenderCancelledError || renderJob.cancelled) {
             throw err;
@@ -532,6 +705,7 @@ export class RenderPipeline {
             renderJob,
           );
         }
+        }
 
         if (!(await verifyVideoFile(videoPath))) {
           throw new Error(`Video render failed (${variant.key}) — output invalid`);
@@ -557,6 +731,27 @@ export class RenderPipeline {
           ? path.join(dir, 'renders', `export-${variant.suffix}.${exportFormat}`)
           : path.join(exportDir, `${slug}-${exportTs}-${variant.key}.${exportFormat}`);
 
+        let ffmpegDone = false;
+        if (resume && isStepDone(checkpoint, variantStep(vSuffix, 'ffmpeg'))) {
+          if (variant.splitShorts) {
+            const existingShorts = fs
+              .readdirSync(exportDir)
+              .filter((f) => f.includes('-short-') && f.endsWith(`.${exportFormat}`))
+              .map((f) => path.join(exportDir, f))
+              .sort();
+            if (existingShorts.length) {
+              shortsOutputPaths.push(...existingShorts);
+              allOutputPaths.push(...existingShorts);
+              ffmpegDone = true;
+            }
+          } else if (fs.existsSync(encodeTarget) && (await verifyVideoFile(encodeTarget))) {
+            fullOutputPaths.push(encodeTarget);
+            allOutputPaths.push(encodeTarget);
+            ffmpegDone = true;
+          }
+        }
+
+        if (!ffmpegDone) {
         report(
           'ffmpeg',
           progressHi - 4,
@@ -614,6 +809,17 @@ export class RenderPipeline {
           fullOutputPaths.push(encodeTarget);
           allOutputPaths.push(encodeTarget);
         }
+        markStep(dir, variantStep(vSuffix, 'ffmpeg'));
+        checkpoint = loadCheckpoint(dir);
+        } else {
+          report('ffmpeg', progressHi - 4, `Resume — export already done (${variantLabel})`);
+          if (variant.splitShorts && shortsOutputPaths.length) {
+            /* kept from prior run */
+          } else if (fs.existsSync(encodeTarget)) {
+            fullOutputPaths.push(encodeTarget);
+            allOutputPaths.push(encodeTarget);
+          }
+        }
       }
 
       if (includeShorts) {
@@ -640,6 +846,9 @@ export class RenderPipeline {
       }
 
       report('done', 100, doneMessage);
+      clearCheckpoint(dir);
+      project.canResume = false;
+      project.resumeAvailable = false;
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
 
       return project;
@@ -655,6 +864,13 @@ export class RenderPipeline {
       }
       project.status = 'failed';
       project.error = err.message;
+      project.canResume = true;
+      project.resumeAvailable = true;
+      saveCheckpoint(dir, {
+        failedAt: new Date().toISOString(),
+        failedStage: project.stage,
+        failedMessage: err.message,
+      });
       fs.writeFileSync(projectPath, JSON.stringify(project, null, 2));
       throw err;
     } finally {

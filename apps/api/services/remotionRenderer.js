@@ -22,6 +22,24 @@ import { prepareRemotionScenes } from '../utils/sceneClipTiming.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
 import { getResolution } from './videoRenderer.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
+import {
+  isMaxPerformanceMode,
+  logRemotionPerformancePlan,
+  preferLineSubtitles,
+  resolveChromiumOptions,
+  resolveHardwareAcceleration,
+  resolveJpegQuality,
+  resolveOffthreadVideoCacheBytes,
+  resolveConcurrencyForScenes,
+  resolveDelayRenderTimeoutMs,
+  resolveRemotionConcurrency,
+  resolveVideoBitrate,
+  resolveX264Preset,
+  shouldStripHeavyEffects,
+} from '../utils/remotionPerformance.js';
+
+/** Reuse webpack bundle when re-rendering the same public asset folder (resume/retry). */
+const bundleCache = new Map();
 
 const ROOT = getRepoRoot(path.dirname(fileURLToPath(import.meta.url)));
 const REMOTION_ENTRY = path.join(ROOT, 'packages', 'remotion', 'index.ts');
@@ -50,6 +68,17 @@ function copyAssetToPublic(src, publicDir, usedNames, index, fallbackExt = '.jpg
   usedNames.add(name);
 
   const dest = path.join(publicDir, name);
+  if (fs.existsSync(dest)) {
+    try {
+      const srcStat = fs.statSync(src);
+      const destStat = fs.statSync(dest);
+      if (srcStat.size === destStat.size && srcStat.size > 0) {
+        return name;
+      }
+    } catch {
+      /* re-copy */
+    }
+  }
   fs.copyFileSync(src, dest);
   return name;
 }
@@ -57,8 +86,9 @@ function copyAssetToPublic(src, publicDir, usedNames, index, fallbackExt = '.jpg
 /**
  * Copy absolute media paths into a Remotion public dir and return relative names.
  */
-export function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = []) {
-  if (fs.existsSync(publicDir)) {
+export function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = {}, opts = {}) {
+  const preserve = Boolean(opts.preserveExisting);
+  if (!preserve && fs.existsSync(publicDir)) {
     fs.rmSync(publicDir, { recursive: true, force: true });
   }
   fs.mkdirSync(publicDir, { recursive: true });
@@ -153,6 +183,44 @@ function buildChapterBadges(timeline, fps, introSec) {
   return badges;
 }
 
+/** Speed mode — keeps template colors/transitions; drops motion blur, leaks, grain, kinetic subs. */
+function applyRenderPerformanceProfile(renderProps, { fastRender = false } = {}) {
+  if (!shouldStripHeavyEffects(fastRender) || !renderProps.visualTheme) {
+    return { props: renderProps, fastApplied: false };
+  }
+
+  const theme = renderProps.visualTheme;
+  const tr = theme.transitions || {};
+  const visualTheme = {
+    ...theme,
+    filmGrain: 0,
+    effects: {
+      ...(theme.effects || {}),
+      motionBlur: false,
+      lightLeak: false,
+      accentShapes: false,
+      pulseVignette: false,
+      filmGrain: 0,
+      chromaticAberration: false,
+      glitchIntensity: 0,
+    },
+    transitions: {
+      ...tr,
+      durationFrames: Math.min(Number(tr.durationFrames) || 15, 10),
+    },
+  };
+
+  let wordCues = renderProps.wordCues;
+  if (preferLineSubtitles() && Array.isArray(wordCues) && wordCues.length > 0) {
+    wordCues = [];
+  }
+
+  return {
+    props: { ...renderProps, visualTheme, wordCues },
+    fastApplied: true,
+  };
+}
+
 export function buildRemotionProps(project) {
   const compositionId = resolveCompositionId(project);
   if (compositionId === 'Walkthrough') {
@@ -164,9 +232,9 @@ export function buildRemotionProps(project) {
 
   const transitions = ['crossfade', 'slide', 'zoom', 'fade', 'wipe'];
   const template = getDocumentaryTemplate(
-    project.renderTemplateId || project.input?.templateId,
+    timeline?.templateId || project.renderTemplateId || project.input?.templateId,
   );
-  const visualTheme = resolveVisualTheme(template);
+  let visualTheme = resolveVisualTheme(template);
   const fps = 30;
   const preset = project.renderPreset || '1080p';
   const { w: width, h: height } = getResolution(preset);
@@ -203,11 +271,23 @@ export function buildRemotionProps(project) {
     [];
 
   const chapterBadges = timeline ? buildChapterBadges(timeline, fps, introSec) : [];
+  const sceneList = scenes.filter((s) => s.src);
+  const heavySceneCount = sceneList.length;
+
+  if (heavySceneCount > 8 && visualTheme?.effects) {
+    visualTheme = {
+      ...visualTheme,
+      effects: {
+        ...visualTheme.effects,
+        motionBlur: false,
+      },
+    };
+  }
 
   return {
     title: script?.topic || 'Documentary',
     sections: script?.sections || [],
-    scenes: scenes.filter((s) => s.src),
+    scenes: sceneList,
     subtitleCues: project.subtitleCues || [],
     wordCues: project.wordCues || [],
     chapterBadges,
@@ -243,36 +323,83 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     options.publicDir || path.join(path.dirname(outputPath), 'remotion-public');
 
   const scenesOrScreens = isWalkthrough ? props.screens || [] : props.scenes || [];
+  let renderProps = { ...props };
+  const perf = applyRenderPerformanceProfile(renderProps, {
+    fastRender: Boolean(options.fastRender) || isMaxPerformanceMode(),
+  });
+  renderProps = perf.props;
+  if (perf.fastApplied) {
+    console.log(
+      '[Remotion] Speed profile — motion blur/light leaks/grain off, shorter transitions, line subtitles',
+    );
+  } else if (options.fastRender && renderProps.visualTheme?.effects) {
+    renderProps = {
+      ...renderProps,
+      visualTheme: {
+        ...renderProps.visualTheme,
+        effects: { ...renderProps.visualTheme.effects, motionBlur: false },
+      },
+    };
+  }
+
   const { scenes, extras } = prepareRemotionPublicAssets(
     scenesOrScreens,
     publicDir,
-    props.narrationAudioSrc
-      ? { narration: props.narrationAudioSrc }
-      : {},
+    renderProps.narrationAudioSrc ? { narration: renderProps.narrationAudioSrc } : {},
+    { preserveExisting: Boolean(options.preservePublicDir) },
   );
 
   const timedScenes = isWalkthrough
     ? scenes
     : await prepareRemotionScenes(scenes, publicDir);
 
-  const renderProps = {
-    ...props,
+  const finalProps = {
+    ...renderProps,
     ...(isWalkthrough ? { screens: timedScenes } : { scenes: timedScenes }),
-    narrationAudioSrc: extras.narration || props.narrationAudioSrc,
+    narrationAudioSrc: extras.narration || renderProps.narrationAudioSrc,
   };
 
-  const bundleLocation = await bundle({
-    entryPoint: entry,
-    rootDir: ROOT,
-    publicDir,
-    webpackOverride: (config) => config,
-  });
+  const bundleKey = path.resolve(publicDir);
+  let bundleLocation = bundleCache.get(bundleKey);
+  if (!bundleLocation || !fs.existsSync(bundleLocation)) {
+    bundleLocation = await bundle({
+      entryPoint: entry,
+      rootDir: ROOT,
+      publicDir,
+      webpackOverride: (config) => config,
+    });
+    bundleCache.set(bundleKey, bundleLocation);
+  } else {
+    console.log('[Remotion] Reusing cached webpack bundle');
+  }
 
   const composition = await selectComposition({
     serveUrl: bundleLocation,
     id: compositionId,
-    inputProps: renderProps,
+    inputProps: finalProps,
   });
+
+  const totalFrames = composition.durationInFrames || 0;
+  const fps = composition.fps || 30;
+  const durationMin = Math.round((totalFrames / fps / 60) * 10) / 10;
+  let concurrency = resolveRemotionConcurrency();
+  concurrency = resolveConcurrencyForScenes(timedScenes, concurrency);
+  const hardwareAcceleration = resolveHardwareAcceleration();
+  const chromiumOptions = resolveChromiumOptions();
+  const videoBitrate = resolveVideoBitrate();
+  const x264Preset = resolveX264Preset();
+  const offthreadVideoCacheSizeInBytes = resolveOffthreadVideoCacheBytes();
+  const framesPerWorkerSec = Math.max(1.2, concurrency * 1.1);
+  const etaMin = Math.round((totalFrames / framesPerWorkerSec / 60) * 10) / 10;
+
+  logRemotionPerformancePlan({ concurrency, hardwareAcceleration, chromiumOptions });
+  console.log(
+    `[Remotion] ${compositionId} · ${totalFrames} frames (${durationMin} min) · ${composition.width}x${composition.height}`,
+  );
+  if (videoBitrate) {
+    console.log(`[Remotion] GPU video encode · bitrate ${videoBitrate}`);
+  }
+  console.log(`[Remotion] Rough ETA ~${etaMin} min (varies with effects & video clips)`);
 
   const { cancelSignal, cancel } = makeCancelSignal();
   if (options.renderJob) {
@@ -280,32 +407,107 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     if (options.renderJob.cancelled) cancel();
   }
 
+  const durationSec =
+    (composition.durationInFrames || 0) / (composition.fps || 30) || 60;
+  const delayRenderTimeoutMs = resolveDelayRenderTimeoutMs();
+  const timeoutMs = Math.max(
+    delayRenderTimeoutMs,
+    Number(process.env.REMOTION_RENDER_TIMEOUT_MS) || 600_000,
+    Math.ceil(durationSec * 2500),
+  );
+  const jpegQuality = resolveJpegQuality(options.fastRender || perf.fastApplied);
+
   let lastRemotionPct = -1;
+  let lastHeartbeat = 0;
+  const renderStarted = Date.now();
+
+  const onProgress = ({ progress, renderedFrames, encodedFrames }) => {
+    const pct = Math.min(100, Math.floor(progress * 100));
+    const now = Date.now();
+    if (pct > lastRemotionPct || now - lastHeartbeat > 12_000 || pct === 100) {
+      if (pct > lastRemotionPct) lastRemotionPct = pct;
+      lastHeartbeat = now;
+      const elapsed = Math.round((now - renderStarted) / 1000);
+      const frameInfo =
+        renderedFrames != null
+          ? ` · ${renderedFrames}/${totalFrames || '?'} frames`
+          : '';
+      console.log(`[Remotion:${compositionId}] ${pct}% (${elapsed}s${frameInfo})`);
+      options.onProgress?.({
+        progress,
+        pct,
+        elapsedSec: elapsed,
+        renderedFrames,
+        encodedFrames,
+      });
+    }
+  };
+
   try {
-    await renderMedia({
+    const renderOpts = {
       composition,
       serveUrl: bundleLocation,
       codec: 'h264',
       pixelFormat: 'yuv420p',
       audioCodec: 'aac',
       outputLocation: outputPath,
-      inputProps: renderProps,
+      inputProps: finalProps,
       cancelSignal,
-      chromiumOptions: { disableWebSecurity: true },
-      timeoutInMilliseconds: Number(process.env.REMOTION_RENDER_TIMEOUT_MS) || 300_000,
-      onProgress: ({ progress }) => {
-        const pct = Math.floor(progress * 100);
-        if (pct >= lastRemotionPct + 10 || pct === 100) {
-          lastRemotionPct = pct;
-          console.log(`[Remotion:${compositionId}] ${pct}%`);
-        }
-      },
-    });
+      concurrency,
+      jpegQuality,
+      chromiumOptions,
+      hardwareAcceleration,
+      disallowParallelEncoding: false,
+      timeoutInMilliseconds: timeoutMs,
+      onProgress,
+    };
+    if (videoBitrate) renderOpts.videoBitrate = videoBitrate;
+    if (x264Preset) renderOpts.x264Preset = x264Preset;
+    if (offthreadVideoCacheSizeInBytes) {
+      renderOpts.offthreadVideoCacheSizeInBytes = offthreadVideoCacheSizeInBytes;
+    }
+
+    await renderMedia(renderOpts);
   } catch (err) {
     if (isUserCancelledRender(err) || options.renderJob?.cancelled) {
       throw new RenderCancelledError();
     }
-    throw err;
+
+    const hwFailed =
+      hardwareAcceleration === 'prefer-hardware' &&
+      /hardware|acceleration|encoder|nvenc|qsv|vaapi/i.test(String(err?.message || ''));
+    if (hwFailed) {
+      console.warn(
+        '[Remotion] GPU encode failed — retrying with software encoding:',
+        err.message,
+      );
+      await renderMedia({
+        composition,
+        serveUrl: bundleLocation,
+        codec: 'h264',
+        pixelFormat: 'yuv420p',
+        audioCodec: 'aac',
+        outputLocation: outputPath,
+        inputProps: finalProps,
+        cancelSignal,
+        concurrency,
+        jpegQuality,
+        chromiumOptions,
+        hardwareAcceleration: 'prefer-software',
+        x264Preset: x264Preset || 'veryfast',
+        disallowParallelEncoding: false,
+        timeoutInMilliseconds: timeoutMs,
+        ...(offthreadVideoCacheSizeInBytes
+          ? { offthreadVideoCacheSizeInBytes }
+          : {}),
+        onProgress,
+      });
+    } else {
+      const elapsed = Math.round((Date.now() - renderStarted) / 1000);
+      throw new Error(
+        `${err.message || err} (after ${elapsed}s — lower REMOTION_CONCURRENCY if out of memory)`,
+      );
+    }
   }
 
   if (options.renderJob?.cancelled) {

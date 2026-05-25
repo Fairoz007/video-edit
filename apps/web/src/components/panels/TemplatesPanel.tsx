@@ -90,12 +90,25 @@ export function TemplatesPanel() {
   const isWalkthrough = input.videoStyle === 'walkthrough';
 
   const applyVisualTemplate = async (id: string) => {
+    const name =
+      DOCUMENTARY_VISUAL_TEMPLATES.find((t) => t.id === id)?.name || 'Template';
     setInput({
       videoStyle: 'documentary',
       templateId: id,
     });
-    if (script && media.length > 0) {
-      await rebuildTimelineFlow({ videoStyle: 'documentary', templateId: id });
+    if (!script || media.length === 0) {
+      useProjectStore
+        .getState()
+        .setProgress(0, '', `${name} selected — applies when timeline is built`);
+      return;
+    }
+    const ok = await rebuildTimelineFlow({ videoStyle: 'documentary', templateId: id });
+    if (!ok) {
+      useProjectStore
+        .getState()
+        .setError('Could not rebuild timeline for this template — check media & script');
+    } else {
+      useProjectStore.getState().setProgress(0, '', `Timeline updated · ${name}`);
     }
   };
 
@@ -140,7 +153,12 @@ export function TemplatesPanel() {
             templates={YOUTUBE_SHORTS_VISUAL_TEMPLATES}
             activeId={exportOptions.shortsTemplateId || DEFAULT_SHORTS_TEMPLATE_ID}
             defaultId={DEFAULT_SHORTS_TEMPLATE_ID}
-            onSelect={(id) => setExportOptions({ shortsTemplateId: id })}
+            onSelect={(id) => {
+              const name =
+                YOUTUBE_SHORTS_VISUAL_TEMPLATES.find((t) => t.id === id)?.name || 'Shorts';
+              setExportOptions({ shortsTemplateId: id });
+              useProjectStore.getState().setProgress(0, '', `Shorts template · ${name}`);
+            }}
           />
         </section>
       )}

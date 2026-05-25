@@ -36,6 +36,19 @@ export const EffectsLayer: React.FC = () => {
   const pulseVignette = Boolean(effects.pulseVignette);
   const accent = hexToRgb(theme.palette.primary);
   const vignetteStrength = effects.vignette ?? theme.vignette ?? 0.35;
+
+  const hasHeavyFx =
+    effects.lightLeak ||
+    effects.accentShapes ||
+    filmGrain > 0.02 ||
+    chromatic ||
+    glitch > 0 ||
+    pulseVignette;
+
+  if (!hasHeavyFx) {
+    return null;
+  }
+
   const pulseVignetteOpacity = pulseVignette
     ? vignetteStrength *
       interpolate(frame % 90, [0, 45, 90], [0.85, 1.15, 0.85], {
