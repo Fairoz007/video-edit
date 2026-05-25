@@ -175,31 +175,6 @@ export function ExportSettings() {
         />
       </SettingsField>
 
-      <motion.div className="flex items-center justify-between py-1">
-        <div>
-          <span className="text-xs text-forge-text-secondary block">Fast render</span>
-          <span className="text-[10px] text-forge-muted">
-            Extra speed on top of max-performance — same as REMOTION_MAX_PERFORMANCE effects
-          </span>
-        </div>
-        <button
-          type="button"
-          aria-pressed={Boolean(exportOptions.fastRender)}
-          onClick={() =>
-            setExportOptions({ fastRender: !exportOptions.fastRender })
-          }
-          className={`w-10 h-5 rounded-full relative transition-all ${
-            exportOptions.fastRender ? 'accent-gradient shadow-glow-sm' : 'bg-white/10'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
-              exportOptions.fastRender ? 'left-[22px]' : 'left-0.5'
-            }`}
-          />
-        </button>
-      </motion.div>
-
       {[
         { label: 'Cinematic LUT export', on: lutExport, set: setLutExport },
         { label: 'AI upscaling', on: aiUpscale, set: setAiUpscale },

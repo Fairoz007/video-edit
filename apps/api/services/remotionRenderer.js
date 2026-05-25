@@ -19,7 +19,9 @@ import {
   resolveVisualTheme,
 } from '@docuforge/config/documentaryTemplates';
 import { prepareRemotionScenes } from '../utils/sceneClipTiming.js';
+import { copyOrProxyVideoForRemotion, isVideoAssetPath } from '../utils/remotionVideoProxy.js';
 import { verifyVideoFile } from '../utils/videoValidate.js';
+import { setGpuRenderLock } from './chatterboxBridge.js';
 import { getResolution } from './videoRenderer.js';
 import { getRepoRoot } from '@docuforge/config/repoRoot';
 import {
@@ -30,6 +32,7 @@ import {
   resolveHardwareAcceleration,
   resolveJpegQuality,
   resolveOffthreadVideoCacheBytes,
+  resolveOffthreadVideoThreads,
   resolveConcurrencyForScenes,
   resolveDelayRenderTimeoutMs,
   resolveRemotionConcurrency,
@@ -83,10 +86,23 @@ function copyAssetToPublic(src, publicDir, usedNames, index, fallbackExt = '.jpg
   return name;
 }
 
+async function prepareSceneAsset(src, publicDir, usedNames, index) {
+  if (!src || src.startsWith('http://') || src.startsWith('https://')) return src;
+  if (!isAbsoluteAssetPath(src)) return src;
+  if (!fs.existsSync(src)) {
+    console.warn(`[Remotion] Missing asset: ${src}`);
+    return src;
+  }
+  if (isVideoAssetPath(src) && isMaxPerformanceMode()) {
+    return copyOrProxyVideoForRemotion(src, publicDir, usedNames, index);
+  }
+  return copyAssetToPublic(src, publicDir, usedNames, index);
+}
+
 /**
  * Copy absolute media paths into a Remotion public dir and return relative names.
  */
-export function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = {}, opts = {}) {
+export async function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = {}, opts = {}) {
   const preserve = Boolean(opts.preserveExisting);
   if (!preserve && fs.existsSync(publicDir)) {
     fs.rmSync(publicDir, { recursive: true, force: true });
@@ -94,23 +110,30 @@ export function prepareRemotionPublicAssets(scenes, publicDir, extraAssets = {},
   fs.mkdirSync(publicDir, { recursive: true });
   const usedNames = new Set();
   let copied = 0;
+  let proxied = 0;
 
-  const preparedScenes = (scenes || []).map((scene, i) => {
-    const src = scene?.src;
-    const name = copyAssetToPublic(src, publicDir, usedNames, i);
-    if (name !== src && isAbsoluteAssetPath(src)) copied++;
-    return { ...scene, src: name };
-  });
+  const preparedScenes = await Promise.all(
+    (scenes || []).map(async (scene, i) => {
+      const src = scene?.src;
+      const name = await prepareSceneAsset(src, publicDir, usedNames, i);
+      if (name !== src && isAbsoluteAssetPath(src)) {
+        copied++;
+        if (String(name).includes('-rproxy.')) proxied++;
+      }
+      return { ...scene, src: name };
+    }),
+  );
 
   const preparedExtras = {};
   for (const [key, src] of Object.entries(extraAssets)) {
     if (!src) continue;
-    const name = copyAssetToPublic(src, publicDir, usedNames, copied);
+    const name = await prepareSceneAsset(src, publicDir, usedNames, copied);
     if (name !== src && isAbsoluteAssetPath(src)) copied++;
     preparedExtras[key] = name;
   }
 
-  console.log(`[Remotion] Prepared ${copied} asset(s) in ${publicDir}`);
+  const proxyNote = proxied > 0 ? ` · ${proxied} video proxy(ies)` : '';
+  console.log(`[Remotion] Prepared ${copied} asset(s) in ${publicDir}${proxyNote}`);
   return { publicDir, scenes: preparedScenes, extras: preparedExtras };
 }
 
@@ -342,16 +365,27 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     };
   }
 
-  const { scenes, extras } = prepareRemotionPublicAssets(
+  const { scenes, extras } = await prepareRemotionPublicAssets(
     scenesOrScreens,
     publicDir,
     renderProps.narrationAudioSrc ? { narration: renderProps.narrationAudioSrc } : {},
     { preserveExisting: Boolean(options.preservePublicDir) },
   );
 
-  const timedScenes = isWalkthrough
+  let timedScenes = isWalkthrough
     ? scenes
     : await prepareRemotionScenes(scenes, publicDir);
+
+  if (perf.fastApplied && !isWalkthrough) {
+    timedScenes = timedScenes.map((s) => ({
+      ...s,
+      transition: 'crossfade',
+      kenBurnsFrom: 1,
+      kenBurnsTo: 1,
+      panStartX: 0,
+      panEndX: 0,
+    }));
+  }
 
   const finalProps = {
     ...renderProps,
@@ -389,6 +423,7 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
   const videoBitrate = resolveVideoBitrate();
   const x264Preset = resolveX264Preset();
   const offthreadVideoCacheSizeInBytes = resolveOffthreadVideoCacheBytes();
+  const offthreadVideoThreads = resolveOffthreadVideoThreads();
   const framesPerWorkerSec = Math.max(1.2, concurrency * 1.1);
   const etaMin = Math.round((totalFrames / framesPerWorkerSec / 60) * 10) / 10;
 
@@ -398,6 +433,12 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
   );
   if (videoBitrate) {
     console.log(`[Remotion] GPU video encode · bitrate ${videoBitrate}`);
+  }
+  if (offthreadVideoCacheSizeInBytes) {
+    const cacheMb = Math.round(offthreadVideoCacheSizeInBytes / 1024 / 1024);
+    console.log(
+      `[Remotion] OffthreadVideo cache ${cacheMb}MB · extract threads ${offthreadVideoThreads || 'auto'}`,
+    );
   }
   console.log(`[Remotion] Rough ETA ~${etaMin} min (varies with effects & video clips)`);
 
@@ -443,6 +484,7 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     }
   };
 
+  setGpuRenderLock(true);
   try {
     const renderOpts = {
       composition,
@@ -465,6 +507,9 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
     if (x264Preset) renderOpts.x264Preset = x264Preset;
     if (offthreadVideoCacheSizeInBytes) {
       renderOpts.offthreadVideoCacheSizeInBytes = offthreadVideoCacheSizeInBytes;
+    }
+    if (offthreadVideoThreads) {
+      renderOpts.offthreadVideoThreads = offthreadVideoThreads;
     }
 
     await renderMedia(renderOpts);
@@ -500,6 +545,7 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
         ...(offthreadVideoCacheSizeInBytes
           ? { offthreadVideoCacheSizeInBytes }
           : {}),
+        ...(offthreadVideoThreads ? { offthreadVideoThreads } : {}),
         onProgress,
       });
     } else {
@@ -508,6 +554,8 @@ export async function renderRemotionPreview(props, outputPath, options = {}) {
         `${err.message || err} (after ${elapsed}s — lower REMOTION_CONCURRENCY if out of memory)`,
       );
     }
+  } finally {
+    setGpuRenderLock(false);
   }
 
   if (options.renderJob?.cancelled) {

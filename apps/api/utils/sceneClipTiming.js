@@ -61,23 +61,19 @@ function resolveAssetPath(src, publicDir) {
 
 /** Probe files and apply loop/trim-safe timing before Remotion render. */
 export async function prepareRemotionScenes(scenes, publicDir) {
-  const out = [];
-  for (const scene of scenes || []) {
-    let row = { ...scene };
-    const isVideo = row.type === 'video' || row.media?.type === 'video';
-    if (!isVideo) {
-      out.push(row);
-      continue;
-    }
+  return Promise.all(
+    (scenes || []).map(async (scene) => {
+      let row = { ...scene };
+      const isVideo = row.type === 'video' || row.media?.type === 'video';
+      if (!isVideo) return row;
 
-    const filePath = resolveAssetPath(row.src, publicDir);
-    if (filePath) {
-      const probed = await getMediaDurationSec(filePath);
-      if (probed) row.sourceDurationSec = probed;
-    }
+      const filePath = resolveAssetPath(row.src, publicDir);
+      if (filePath) {
+        const probed = await getMediaDurationSec(filePath);
+        if (probed) row.sourceDurationSec = probed;
+      }
 
-    row = syncSceneVideoTiming(row);
-    out.push(row);
-  }
-  return out;
+      return syncSceneVideoTiming(row);
+    }),
+  );
 }

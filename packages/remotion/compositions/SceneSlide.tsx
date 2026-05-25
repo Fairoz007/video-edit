@@ -9,7 +9,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import { Video } from '@remotion/media';
+import { OffthreadVideo } from 'remotion';
 import { resolveMediaSrc } from '../lib/assets';
 import { colorGradeFilter } from '../lib/colorGrade';
 import { useVisualTemplate } from '../lib/visualTemplate';
@@ -105,10 +105,9 @@ export const SceneSlide: React.FC<{ scene: Scene }> = ({ scene }) => {
         />
       )}
       {scene.type === 'video' ? (
-        <Video
+        <OffthreadVideo
           src={src}
-          objectFit="cover"
-          style={mediaStyle}
+          style={{ ...mediaStyle, objectFit: 'cover' }}
           trimBefore={trimBeforeFrames}
           trimAfter={trimAfterFrames}
           playbackRate={playbackRate}

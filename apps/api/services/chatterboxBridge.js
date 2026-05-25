@@ -23,6 +23,8 @@ let nextId = 1;
 const pending = new Map();
 /** After worker start/timeout failure, use one-shot for remaining chunks in this process. */
 let workerDisabled = false;
+/** While Remotion uses GPU encode + Chromium, block TTS from reloading CUDA models. */
+let gpuRenderLock = false;
 
 /** Python worker already prefixes many lines with [Chatterbox]. */
 function logChatterboxStderr(chunk) {
@@ -135,7 +137,21 @@ export function getChatterboxPython() {
 
 let startingPromise = null;
 
+export function setGpuRenderLock(locked) {
+  gpuRenderLock = Boolean(locked);
+  if (locked) {
+    killWorker();
+  }
+}
+
+export function isGpuRenderLocked() {
+  return gpuRenderLock;
+}
+
 export async function ensureChatterboxWorker() {
+  if (gpuRenderLock) {
+    throw new Error('GPU reserved for Remotion video render');
+  }
   if (workerDisabled) {
     throw new Error('Chatterbox worker disabled after prior failure');
   }
@@ -285,6 +301,10 @@ export async function synthesizeChatterbox({
   cfgWeight,
   forceOneshot = false,
 }) {
+  if (gpuRenderLock) {
+    throw new Error('TTS paused — Remotion render is using the GPU');
+  }
+
   const trimmed = (text || '').trim();
   if (!trimmed) {
     throw new Error('Text is required for Chatterbox synthesis');
@@ -366,6 +386,8 @@ export function shutdownChatterboxWorker() {
 /** Start persistent worker and load Turbo weights on GPU. No-op when CHATTERBOX_ONESHOT=1. */
 export function prewarmChatterboxWorker() {
   if (process.env.CHATTERBOX_ONESHOT !== '0') return;
+  if (process.env.CHATTERBOX_PREWARM_ON_START === '0') return;
+  if (gpuRenderLock) return;
 
   (async () => {
     await ensureChatterboxWorker();

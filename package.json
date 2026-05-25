@@ -15,7 +15,7 @@
   "scripts": {
     "kill:ports": "node scripts/kill-ports.mjs",
     "dev:check-ports": "node scripts/warn-if-ports-busy.mjs",
-    "dev": "npm run dev:check-ports && concurrently -k -n api,web,desktop -c blue,green,magenta \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\" \"npm run dev -w @docuforge/desktop\"",
+    "dev": "npm run dev:check-ports && concurrently -k -n api,web,desktop -c blue,green,magenta \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\" \"wait-on -t 120000 tcp:127.0.0.1:3847 && npm run dev -w @docuforge/desktop\"",
     "dev:force": "npm run kill:ports && npm run dev",
     "dev:web": "npm run dev:check-ports && concurrently -k -n api,web -c blue,green \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/web\"",
     "dev:web:force": "npm run kill:ports && npm run dev:web",

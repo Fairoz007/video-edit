@@ -652,7 +652,7 @@ export class RenderPipeline {
             compositionId,
             renderJob,
             preservePublicDir: resume,
-            fastRender: Boolean(options.fastRender),
+            fastRender: true,
             onProgress: ({ pct, elapsedSec, renderedFrames }) => {
               const sub = progressLo + 5 + (remotionProgressSpan * pct) / 100;
               const frameNote =

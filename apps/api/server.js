@@ -114,7 +114,11 @@ const server = app.listen(PORT, '127.0.0.1', () => {
     ttsProvider === 'chatterbox' ||
     (ttsProvider === 'auto' && !process.env.ELEVENLABS_API_KEY);
 
-  if (shouldUseChatterbox && process.env.CHATTERBOX_ONESHOT === '0') {
+  if (
+    shouldUseChatterbox &&
+    process.env.CHATTERBOX_ONESHOT === '0' &&
+    process.env.CHATTERBOX_PREWARM_ON_START !== '0'
+  ) {
     prewarmChatterboxWorker();
   }
 });

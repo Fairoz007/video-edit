@@ -67,6 +67,16 @@ export function resolveOffthreadVideoCacheBytes() {
   return undefined;
 }
 
+export function resolveOffthreadVideoThreads() {
+  const raw = Number(process.env.REMOTION_OFFTHREAD_VIDEO_THREADS);
+  if (Number.isFinite(raw) && raw > 0) return Math.min(8, Math.floor(raw));
+  if (isMaxPerformanceMode()) {
+    const cpus = os.cpus()?.length || 4;
+    return Math.min(4, Math.max(2, Math.floor(cpus / 2)));
+  }
+  return undefined;
+}
+
 /** Kinetic (per-word) subtitles are costly — use line cues when true. */
 export function preferLineSubtitles() {
   if (process.env.REMOTION_KINETIC_SUBTITLES === '1') return false;

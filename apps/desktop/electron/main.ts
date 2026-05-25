@@ -242,7 +242,7 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 720,
     title: 'DocuForge',
-    show: true,
+    show: !isDev,
     backgroundColor: '#0a0a0f',
     autoHideMenuBar: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -255,7 +255,11 @@ function createWindow() {
 
   mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
     console.error('[DocuForge] Page load failed:', code, desc, url);
-    if (!isDev && usedBackendUrl && mainWindow) {
+    if (isDev) {
+      mainWindow?.show();
+      return;
+    }
+    if (usedBackendUrl && mainWindow) {
       usedBackendUrl = false;
       loadProductionUi(false);
     }
@@ -314,7 +318,7 @@ async function bootstrapBackend() {
   loadProductionUi(true);
 }
 
-async function waitForVite(maxAttempts = 60, intervalMs = 500): Promise<boolean> {
+async function waitForVite(maxAttempts = 40, intervalMs = 250): Promise<boolean> {
   const url = 'http://127.0.0.1:5173/';
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -330,12 +334,14 @@ async function waitForVite(maxAttempts = 60, intervalMs = 500): Promise<boolean>
 
 async function loadDevUi() {
   if (!mainWindow) return;
-  await bootstrapBackend();
   const viteOk = await waitForVite();
   if (!viteOk) {
-    console.warn('[DocuForge] Vite dev server not ready on :5173');
+    console.warn('[DocuForge] Vite dev server not ready on :5173 — is web dev running?');
   }
-  await mainWindow.loadURL('http://127.0.0.1:5173');
+  const showWhenReady = () => mainWindow?.show();
+  mainWindow.webContents.once('did-finish-load', showWhenReady);
+  setTimeout(showWhenReady, 8000);
+  await mainWindow.loadURL('http://127.0.0.1:5173/');
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
