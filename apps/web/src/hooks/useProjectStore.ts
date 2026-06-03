@@ -35,7 +35,7 @@ export interface ProjectState {
 const defaultInput: DocumentaryInput = {
   topic: '',
   videoStyle: 'documentary',
-  templateId: 'template_cinematic_docuforge',
+  templateId: 'template_premium_longform',
 };
 
 export const useProjectStore = create<ProjectState>((set) => ({

@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProjectStore } from '../../hooks/useProjectStore';
 import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
 import { CheckCircle, AlertCircle, Loader2, RotateCcw, Square } from 'lucide-react';
+import { toExportUrl } from '../../utils/mediaUrl';
 
 const STAGES = [
   'script',
@@ -102,7 +103,10 @@ export function RenderProgress() {
           <button
             type="button"
             className="mt-3 text-xs text-sky-400 hover:text-sky-300 transition-colors"
-            onClick={() => window.docuforge?.showItemInFolder(outputPath)}
+            onClick={() => {
+              if (outputPath?.startsWith('http')) window.open(outputPath, '_blank');
+              else if (outputPath) window.open(toExportUrl(outputPath), '_blank');
+            }}
           >
             Open export folder →
           </button>

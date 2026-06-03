@@ -6,7 +6,7 @@ Automatic documentary video generator — **no AI APIs** for scripting. Uses rul
 
 | Layer | Technology |
 |-------|------------|
-| Desktop | Electron, React, TailwindCSS, Framer Motion |
+| Web UI | Vite + React (legacy) or Next.js + Convex (SaaS) |
 | Backend | Node.js, Express |
 | Render | FFmpeg, Remotion, MoviePy (Python) |
 | NLP | compromise.js, keyword-extractor |
@@ -16,13 +16,15 @@ Automatic documentary video generator — **no AI APIs** for scripting. Uses rul
 
 ```
 ├── apps/
-│   ├── web/           # Vite + React UI
-│   ├── api/           # Express backend, TTS, scrapers, pipelines
-│   └── desktop/       # Electron shell
+│   ├── web/           # Vite + React UI (local dev)
+│   ├── saas-web/      # Next.js + Convex cloud UI
+│   └── api/           # Express backend, TTS, scrapers, pipelines
 ├── packages/
 │   ├── remotion/      # Remotion compositions
+│   ├── convex/        # Convex schema & functions (SaaS)
+│   ├── shared/        # Shared types
 │   └── config/        # Shared monorepo utilities
-├── projects/          # Per-project assets
+├── projects/          # Per-project assets (local)
 ├── cache/             # Downloaded media
 ├── exports/           # Final MP4/MOV
 └── scripts/           # Dev & maintenance scripts
@@ -48,13 +50,13 @@ npm install
 3. Downloads Chatterbox-Turbo model weights (Hugging Face)
 4. Installs Playwright Chromium
 
-Then add API keys to `.env` (Pexels, Pixabay, Groq, etc.) and start **from the repo root** (one command — no per-app terminals):
+Then add API keys to `.env` (Pexels, Pixabay, Groq, etc.) and start **from the repo root**:
 
 ```bash
-npm run dev          # API + Vite + Electron (development)
-npm run dev:web      # API + Vite in browser only
-npm run start        # Production: build UI, API + Electron (no Vite dev server)
-npm run start:web    # Production: build UI, API + static preview in browser
+npm run dev          # API + Vite (browser)
+npm run dev:web      # Same as dev
+npm run start        # Production: build UI, API + static preview
+npm run dev:saas:full # API + Convex + Next.js SaaS editor
 ```
 
 **Skip auto-setup** (CI / no Python): `DOCUFORGE_SKIP_SETUP=1 npm install`  
@@ -85,12 +87,12 @@ All commands run from the **monorepo root** unless noted.
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | API + Vite + Electron (single terminal) |
+| `npm run dev` | API + Vite in browser |
 | `npm run dev:web` | API + Vite in browser |
-| `npm run start` | Build + API + Electron (production-like) |
-| `npm run start:web` | Build + API + Vite preview (browser, no Electron) |
-| `npm run build` | Compile Electron shell + production web bundle |
-| `npm run kill:ports` | Free ports 3847 / 5173 (Windows + macOS/Linux) |
+| `npm run dev:saas:full` | API + Convex + Next.js SaaS |
+| `npm run start` | Build + API + Vite preview |
+| `npm run build` | Production web bundle |
+| `npm run kill:ports` | Free ports 3847 / 5173 |
 | `npm run remotion:studio` | Remotion Studio |
 | `npm run setup` | Re-run Python deps + Chatterbox model download |
 | `npm run chatterbox:health` | Check TTS / device |
@@ -115,10 +117,10 @@ Place royalty-free tracks in the repo [`music/`](music/) folder (`.mp3`, `.wav`,
 - 1080p, 4K, YouTube, Shorts, Reels  
 - MP4 (H.264) or MOV (ProRes)  
 
+## SaaS migration
+
+See [`docs/SAAS_MIGRATION.md`](docs/SAAS_MIGRATION.md) for the cloud architecture (Convex, R2, workers).
+
 ## Future AI (disabled)
 
 See `apps/api/services/aiPlaceholder.js` for OpenAI, Ollama, Whisper, ElevenLabs hooks.
-
-
-
-

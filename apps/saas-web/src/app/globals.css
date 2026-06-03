@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  .cinematic-bg {
+    @apply bg-forge-black;
+    background-image:
+      radial-gradient(ellipse 70% 45% at 15% -5%, rgba(91, 99, 240, 0.06), transparent 55%),
+      radial-gradient(ellipse 50% 35% at 95% 5%, rgba(59, 130, 246, 0.04), transparent 50%);
+  }
+
+  .studio-panel {
+    @apply bg-forge-panel border border-forge-border rounded-studio-lg shadow-panel;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .studio-panel-elevated {
+    @apply bg-forge-panel-elevated border border-forge-border-strong rounded-studio-lg shadow-card;
+  }
+
+  .glass-panel {
+    @apply studio-panel backdrop-blur-glass;
+  }
+
+  .glass-panel-float {
+    @apply studio-panel backdrop-blur-glass shadow-float;
+  }
+
+  .glass-nav {
+    @apply bg-forge-surface/95 backdrop-blur-xl border border-forge-border rounded-studio-lg;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .accent-gradient {
+    background-image: linear-gradient(135deg, #5b63f0 0%, #7c6df0 45%, #3b82f6 100%);
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(135deg, #7c83f5 0%, #a78bfa 50%, #60a5fa 100%);
+    @apply bg-clip-text text-transparent;
+  }
+
+  .btn-primary {
+    @apply accent-gradient text-white font-semibold px-4 py-2.5 rounded-studio
+      hover:brightness-110 transition-all duration-200
+      disabled:opacity-40 disabled:cursor-not-allowed disabled:brightness-100;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 rounded-studio text-sm font-medium text-forge-text-secondary
+      bg-white/[0.04] border border-forge-border hover:bg-white/[0.07]
+      hover:text-forge-text hover:border-forge-border-strong transition-all duration-200
+      disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded-studio text-sm text-forge-text-secondary
+      hover:text-forge-text hover:bg-white/[0.05] border border-transparent
+      hover:border-forge-border transition-all duration-200;
+  }
+
+  .btn-icon {
+    @apply p-2 rounded-studio text-forge-muted hover:text-forge-text hover:bg-white/[0.06]
+      transition-all duration-150;
+  }
+
+  .quick-action {
+    @apply shrink-0 inline-flex items-center justify-center gap-1.5 min-h-9 px-3
+      rounded-studio border text-xs font-semibold transition-all duration-150
+      disabled:cursor-not-allowed whitespace-nowrap;
+  }
+
+  .input-field {
+    @apply w-full bg-forge-surface border border-forge-border rounded-studio px-3.5 py-2.5
+      text-sm text-forge-text placeholder-forge-muted focus:outline-none
+      focus:border-forge-border-accent focus:ring-1 focus:ring-forge-accent/25 transition-all duration-200;
+  }
+
+  .studio-slider {
+    @apply w-full h-1 rounded-full appearance-none cursor-pointer bg-white/10;
+  }
+
+  .studio-slider::-webkit-slider-thumb {
+    @apply appearance-none w-3 h-3 rounded-full cursor-pointer bg-forge-accent;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .tab-pill {
+    @apply px-3 py-2 rounded-studio text-label-sm uppercase transition-all duration-200;
+  }
+
+  .tab-pill-active {
+    @apply accent-gradient text-white;
+  }
+
+  .tab-pill-inactive {
+    @apply text-forge-muted hover:text-forge-text-secondary bg-white/[0.03] hover:bg-white/[0.06];
+  }
+
+  .track-lane {
+    @apply relative rounded-studio bg-forge-surface border border-forge-border overflow-hidden;
+  }
+
+  .clip-block {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .playhead-line {
+    @apply absolute top-0 bottom-0 w-px z-20 pointer-events-none bg-forge-cyan;
+  }
+
+  .playhead-cap {
+    @apply absolute -top-0.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rotate-45 bg-forge-cyan;
+  }
+
+  .section-label {
+    @apply text-label-sm uppercase text-forge-muted;
+  }
+
+  .neon-slider {
+    @apply studio-slider;
+  }
+}

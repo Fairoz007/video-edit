@@ -1,5 +1,5 @@
 /**
- * FFmpeg — single-pass export tuned for Electron, browsers, and QuickTime.
+ * FFmpeg — single-pass export tuned for browsers and QuickTime.
  */
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';

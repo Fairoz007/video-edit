@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 /**
  * Resolve monorepo root (package.json with `workspaces`).
- * Honors DOCUFORGE_ROOT for Electron / custom layouts.
+ * Honors DOCUFORGE_ROOT for custom monorepo layouts.
  */
 export function getRepoRoot(startDir = path.dirname(fileURLToPath(import.meta.url))) {
   if (process.env.DOCUFORGE_ROOT) {

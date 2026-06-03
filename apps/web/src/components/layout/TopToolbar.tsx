@@ -1,4 +1,3 @@
-import type React from 'react';
 import { motion } from 'framer-motion';
 import {
   ChevronDown,
@@ -6,11 +5,7 @@ import {
   Redo2,
   Save,
   Upload,
-  Share2,
   Cloud,
-  Minus,
-  Square,
-  X,
   Film,
   Pencil,
   PanelLeft,
@@ -22,6 +17,7 @@ import { useProjectStore } from '../../hooks/useProjectStore';
 import { useDocumentaryPipeline } from '../../hooks/useDocumentaryPipeline';
 import { useUiStore } from '../../hooks/useUiStore';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { toExportUrl } from '../../utils/mediaUrl';
 
 export function TopToolbar() {
   const { script, status, progress, input, outputPath } = useProjectStore();
@@ -34,19 +30,17 @@ export function TopToolbar() {
   const saved = status !== 'generating' && status !== 'rendering';
 
   const openExport = () => {
-    if (outputPath) window.docuforge?.showItemInFolder(outputPath);
-    else startRenderFlow();
+    if (outputPath) {
+      const url = outputPath.startsWith('http') ? outputPath : toExportUrl(outputPath);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      startRenderFlow();
+    }
   };
 
   return (
-    <header
-      className="h-14 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-forge-border bg-forge-surface/95 backdrop-blur-xl"
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-    >
-      <motion.div
-        className="flex items-center gap-2.5 shrink-0"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+    <header className="h-14 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-forge-border bg-forge-surface/95 backdrop-blur-xl">
+      <motion.div className="flex items-center gap-2.5 shrink-0">
         {bp !== 'desktop' && (
           <button
             type="button"
@@ -84,10 +78,7 @@ export function TopToolbar() {
         </motion.div>
       </motion.div>
 
-      <div
-        className="flex-1 flex justify-center min-w-0 px-2"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      <div className="flex-1 flex justify-center min-w-0 px-2">
         <button
           type="button"
           className="flex items-center gap-2 px-4 py-2 rounded-studio bg-forge-panel border border-forge-border max-w-md hover:border-forge-border-strong transition-colors group min-w-0 w-full sm:w-auto"
@@ -98,10 +89,7 @@ export function TopToolbar() {
         </button>
       </div>
 
-      <motion.div
-        className="flex items-center gap-1 shrink-0"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      <motion.div className="flex items-center gap-1 shrink-0">
         <div className="hidden md:flex items-center gap-0.5 mr-1 pr-2 border-r border-forge-border">
           <button type="button" className="btn-icon" aria-label="Undo">
             <Undo2 className="w-4 h-4" />
@@ -151,7 +139,7 @@ export function TopToolbar() {
           </button>
         )}
 
-        {(bp !== 'desktop') && (
+        {bp !== 'desktop' && (
           <button
             type="button"
             onClick={() => {
@@ -164,22 +152,6 @@ export function TopToolbar() {
             <PanelRight className="w-4 h-4" />
           </button>
         )}
-
-        <button type="button" className="btn-icon hidden md:flex" aria-label="Share">
-          <Share2 className="w-4 h-4" />
-        </button>
-
-        <div className="hidden sm:flex gap-0.5 ml-1 pl-2 border-l border-forge-border text-forge-muted">
-          <button type="button" className="p-1.5 hover:text-forge-text rounded-studio hover:bg-white/5">
-            <Minus className="w-3 h-3" />
-          </button>
-          <button type="button" className="p-1.5 hover:text-forge-text rounded-studio hover:bg-white/5">
-            <Square className="w-3 h-3" />
-          </button>
-          <button type="button" className="p-1.5 hover:text-red-400 rounded-studio hover:bg-red-500/10">
-            <X className="w-3 h-3" />
-          </button>
-        </div>
       </motion.div>
     </header>
   );

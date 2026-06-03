@@ -24,7 +24,7 @@ export function toCacheUrl(localPath?: string): string | undefined {
   return undefined;
 }
 
-/** Preview URL with byte-range support via API (works in Vite + Electron). */
+/** Preview URL with byte-range support via API. */
 export function toExportUrl(outputPath: string): string {
   const name = encodeURIComponent(exportBasename(outputPath));
   return `${ASSET_BASE}/api/exports/play/${name}`;

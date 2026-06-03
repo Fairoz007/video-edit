@@ -61,6 +61,28 @@ export function createProjectRouter(root) {
     res.json(project);
   });
 
+  /** Write full project.json (Convex SaaS editor → local render worker bridge). */
+  router.post('/sync', (req, res) => {
+    try {
+      const { id, project } = req.body;
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: 'id required' });
+      }
+      if (!project || typeof project !== 'object') {
+        return res.status(400).json({ error: 'project object required' });
+      }
+      projectDir(root, id);
+      const merged = { ...project, id };
+      fs.writeFileSync(
+        path.join(root, 'projects', id, 'project.json'),
+        JSON.stringify(merged, null, 2),
+      );
+      res.json({ ok: true, id });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.put('/:id', (req, res) => {
     const p = path.join(root, 'projects', req.params.id, 'project.json');
     if (!fs.existsSync(p)) return res.status(404).json({ error: 'Not found' });

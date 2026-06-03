@@ -1,9 +1,7 @@
 node_modules/
 dist/
-dist-electron/
 apps/web/dist/
-apps/desktop/dist-electron/
-release/
+apps/saas-web/.next/
 out/
 projects/*/
 !projects/.gitkeep
@@ -12,6 +10,9 @@ cache/*
 exports/*
 !exports/.gitkeep
 .env
+.env.local
+apps/saas-web/.env.local
+migration-bundle.json
 *.log
 .DS_Store
 __pycache__/

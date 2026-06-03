@@ -26,7 +26,7 @@ export function createPipelineRouter(root) {
   const router = Router();
 
   router.get('/templates', (_req, res) => {
-    res.json({ templates: listDocumentaryTemplates(), defaultId: 'template_cinematic_docuforge' });
+    res.json({ templates: listDocumentaryTemplates(), defaultId: 'template_premium_longform' });
   });
 
   router.get('/script-template', (_req, res) => {

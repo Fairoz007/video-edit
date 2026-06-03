@@ -140,17 +140,15 @@ function transitionListForTemplate(visualTheme) {
   return ['crossfade', 'crossfade', 'wipe', 'slide'];
 }
 
-function maxClipsForTemplate(templateId) {
-  if (templateId === 'template_hype_sports') return 3;
-  if (templateId === 'template_premium_longform') return 1;
-  return 2;
+function maxClipsForTemplate(_templateId) {
+  return 1;
 }
 
 export function buildTimeline(script, mediaManifest, audioTracks, options = {}) {
   const videoOnly =
     options.videoOnly === true || options.editMode === 'video-only';
   const visualTheme = options.visualTheme || null;
-  const templateId = options.templateId || 'template_cinematic_docuforge';
+  const templateId = options.templateId || 'template_premium_longform';
   const introGraphicSec = options.introGraphicSec ?? REMOTION_INTRO_GRAPHIC_SEC;
   const TRANSITIONS = transitionListForTemplate(visualTheme);
   const maxClipsPerSection = maxClipsForTemplate(templateId);

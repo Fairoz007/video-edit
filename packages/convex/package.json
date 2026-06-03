@@ -1,0 +1,24 @@
+{
+  "name": "@docuforge/convex",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    "./_generated/api": "./convex/_generated/api.js",
+    "./_generated/dataModel": "./convex/_generated/dataModel.d.ts"
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "codegen": "convex codegen"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/s3-request-presigner": "^3.750.0",
+    "convex": "^1.21.0"
+  },
+  "devDependencies": {
+    "@convex-dev/auth": "^0.0.80",
+    "@auth/core": "0.37.0",
+    "typescript": "^5.7.2"
+  }
+}

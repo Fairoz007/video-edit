@@ -122,7 +122,8 @@ export function VideoPreview() {
 
   const openExport = () => {
     if (!outputPath) return;
-    window.docuforge?.showItemInFolder(outputPath);
+    if (outputPath.startsWith('http')) window.open(outputPath, '_blank');
+    else window.open(toExportUrl(outputPath), '_blank');
   };
 
   const toggleFullscreen = () => {

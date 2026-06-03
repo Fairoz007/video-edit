@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-/** In Vite dev, use same-origin `/api` (proxied to backend). Electron/production use explicit URL. */
+/** In Vite dev, use same-origin `/api` (proxied to backend). Set VITE_API_URL for a remote API. */
 const BASE =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? '' : 'http://127.0.0.1:3847');
