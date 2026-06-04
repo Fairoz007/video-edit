@@ -1,7 +1,7 @@
 'use node';
 
-import { getAuthUserId } from '@convex-dev/auth/server';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { APP_USER_ID } from './lib/constants';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v } from 'convex/values';
 import { action } from './_generated/server';
@@ -21,10 +21,9 @@ export const generateUploadUrl = action({
     sizeBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error('Not authenticated');
+    const userId = APP_USER_ID;
 
-    const project = await ctx.runQuery(internal.projects.getIfOwned, {
+    const project = await ctx.runQuery(internal.internal.projects.getIfOwned, {
       projectId: args.projectId,
       userId,
     });

@@ -3,15 +3,19 @@
 import Link from 'next/link';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@docuforge/convex/_generated/api';
-import { useAuthActions } from '@convex-dev/auth/react';
 import { ImportLocalProjects } from '@/components/ImportLocalProjects';
+import { useEffect } from 'react';
 
 export default function DashboardPage() {
   const me = useQuery(api.userProfiles.me);
   const projects = useQuery(api.projects.list);
   const create = useMutation(api.projects.create);
   const remove = useMutation(api.projects.remove);
-  const { signOut } = useAuthActions();
+  const ensureProfile = useMutation(api.userProfiles.ensure);
+
+  useEffect(() => {
+    ensureProfile().catch(() => {});
+  }, [ensureProfile]);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -24,26 +28,14 @@ export default function DashboardPage() {
               Plan: {me.profile.plan} · renders this month: {me.profile.usage.rendersThisMonth}
             </p>
           )}
-          {me?.email && (
-            <p className="text-[10px] text-gray-600 mt-0.5">{me.email}</p>
-          )}
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="rounded-lg bg-forge-accent/20 border border-forge-accent/50 px-3 py-1.5 text-sm"
-            onClick={() => create({ title: 'New documentary' })}
-          >
-            New project
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-forge-border px-3 py-1.5 text-sm"
-            onClick={() => signOut()}
-          >
-            Sign out
-          </button>
-        </div>
+        <button
+          type="button"
+          className="rounded-lg bg-forge-accent/20 border border-forge-accent/50 px-3 py-1.5 text-sm"
+          onClick={() => create({ title: 'New documentary' })}
+        >
+          New project
+        </button>
       </header>
 
       <section className="mb-8">
@@ -59,7 +51,7 @@ export default function DashboardPage() {
       )}
 
       <ul className="space-y-2">
-        {projects?.map((p: { _id: string; title: string; status: string; legacyLocalId?: string }) => (
+        {projects?.map((p) => (
           <li
             key={p._id}
             className="rounded-lg border border-forge-border/60 hover:border-forge-accent/40"

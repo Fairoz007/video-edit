@@ -4,7 +4,7 @@ import { internalQuery } from '../_generated/server';
 export const getIfOwned = internalQuery({
   args: {
     projectId: v.id('projects'),
-    userId: v.id('users'),
+    userId: v.string(),
   },
   handler: async (ctx, { projectId, userId }) => {
     const project = await ctx.db.get(projectId);

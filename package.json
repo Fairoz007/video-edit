@@ -28,13 +28,14 @@
     "chatterbox:health": "node scripts/chatterbox-cli.mjs --health",
     "playwright:install": "npx playwright install chromium",
     "clean:workspace": "node scripts/clean-workspace.mjs",
-    "dev:convex": "npm run dev -w @docuforge/convex",
-    "dev:saas": "concurrently -k -n convex,saas -c yellow,cyan \"npm run dev -w @docuforge/convex\" \"npm run dev -w @docuforge/saas-web\"",
-    "dev:saas:full": "concurrently -k -n api,convex,saas -c blue,yellow,cyan \"npm run dev -w @docuforge/api\" \"npm run dev -w @docuforge/convex\" \"npm run dev -w @docuforge/saas-web\"",
+    "dev:convex": "convex dev",
+    "dev:saas": "concurrently -k -n convex,saas -c yellow,cyan \"convex dev\" \"npm run dev -w @docuforge/saas-web\"",
+    "dev:saas:full": "concurrently -k -n api,convex,saas -c blue,yellow,cyan \"npm run dev -w @docuforge/api\" \"convex dev\" \"npm run dev -w @docuforge/saas-web\"",
     "export:local-projects": "node scripts/export-local-projects.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "convex": "^1.21.0",
     "wait-on": "^8.0.1"
   }
 }

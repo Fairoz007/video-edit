@@ -33,7 +33,7 @@ export function extensionFromMime(mime: string, filename?: string): string {
 }
 
 export function buildR2Key(
-  userId: Id<'users'>,
+  userId: string,
   projectId: Id<'projects'>,
   kind: string,
   mime: string,
@@ -52,7 +52,7 @@ export function buildCdnUrl(r2Key: string, publicBase: string): string {
   return `${base}/${encoded}`;
 }
 
-export function assertKeyOwnedByUser(r2Key: string, userId: Id<'users'>, projectId: Id<'projects'>) {
+export function assertKeyOwnedByUser(r2Key: string, userId: string, projectId: Id<'projects'>) {
   const expectedPrefix = `u/${userId}/p/${projectId}/`;
   if (!r2Key.startsWith(expectedPrefix)) {
     throw new Error('Invalid storage key for this project');

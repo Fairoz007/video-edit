@@ -1,10 +1,10 @@
-import { getAuthUserId } from '@convex-dev/auth/server';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
+import { APP_USER_ID } from './constants';
 
-export async function requireUserId(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) {
-    throw new Error('Not authenticated');
-  }
-  return userId;
+export function getAppUserId() {
+  return APP_USER_ID;
+}
+
+export async function requireUserId(_ctx: QueryCtx | MutationCtx) {
+  return APP_USER_ID;
 }

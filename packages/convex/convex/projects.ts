@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { DEFAULT_TEMPLATE_ID } from './lib/constants';
+import { ensureUserProfile } from './lib/userProfile';
 import { legacyToConvexFields } from './lib/legacyProject';
 
 const projectStatus = v.union(
@@ -94,6 +95,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    await ensureUserProfile(ctx, userId);
     const now = Date.now();
     const input = { ...defaultInput(), ...(args.input ?? {}) };
     input.templateId = DEFAULT_TEMPLATE_ID;
@@ -133,8 +135,6 @@ export const update = mutation({
       exportOptions: v.optional(v.any()),
       outputAssetId: v.optional(v.id('assets')),
       legacyLocalId: v.optional(v.string()),
-      voiceSettings: v.optional(v.any()),
-      exportOptions: v.optional(v.any()),
     }),
   },
   handler: async (ctx, { projectId, patch }) => {

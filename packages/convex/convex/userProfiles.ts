@@ -1,37 +1,22 @@
-import { getAuthUserId } from '@convex-dev/auth/server';
-import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
-import { ensureUserProfile } from './lib/userProfile';
+import { APP_USER_ID } from './lib/constants';
+import { ensureUserProfile, getProfileByUserId } from './lib/userProfile';
 
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    const user = await ctx.db.get(userId);
-    const profile = await ctx.db
-      .query('userProfiles')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique();
-
+    const profile = await getProfileByUserId(ctx, APP_USER_ID);
     return {
-      userId,
-      email: user?.email ?? null,
-      name: user?.name ?? null,
-      image: user?.image ?? null,
+      userId: APP_USER_ID,
       profile,
     };
   },
 });
 
-/** Idempotent — creates free-tier profile if missing (e.g. pre-callback sign-ins). */
 export const ensure = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error('Not authenticated');
-    await ensureUserProfile(ctx, userId);
-    return userId;
+    await ensureUserProfile(ctx, APP_USER_ID);
+    return APP_USER_ID;
   },
 });

@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.80",
     "@docuforge/convex": "*",
     "@docuforge/shared": "*",
     "convex": "^1.21.0",

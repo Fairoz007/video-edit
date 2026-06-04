@@ -1,12 +1,9 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
-import { authTables } from '@convex-dev/auth/server';
 
 export default defineSchema({
-  ...authTables,
-
   userProfiles: defineTable({
-    userId: v.id('users'),
+    userId: v.string(),
     plan: v.union(v.literal('free'), v.literal('pro'), v.literal('team')),
     usage: v.object({
       rendersThisMonth: v.number(),
@@ -17,7 +14,7 @@ export default defineSchema({
   }).index('by_user', ['userId']),
 
   projects: defineTable({
-    userId: v.id('users'),
+    userId: v.string(),
     title: v.string(),
     status: v.union(
       v.literal('draft'),
@@ -38,11 +35,9 @@ export default defineSchema({
     progress: v.number(),
     stage: v.string(),
     message: v.string(),
-    /** Transitional — local path until R2 export assets (Phase 2). */
     outputPath: v.optional(v.string()),
     outputAssetId: v.optional(v.id('assets')),
     error: v.optional(v.string()),
-    /** Original filesystem id (e.g. uuid from projects/) when imported. */
     legacyLocalId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -53,7 +48,7 @@ export default defineSchema({
 
   assets: defineTable({
     projectId: v.id('projects'),
-    userId: v.id('users'),
+    userId: v.string(),
     kind: v.union(
       v.literal('stock_video'),
       v.literal('upload'),
@@ -75,7 +70,7 @@ export default defineSchema({
 
   renderJobs: defineTable({
     projectId: v.id('projects'),
-    userId: v.id('users'),
+    userId: v.string(),
     status: v.union(
       v.literal('queued'),
       v.literal('claimed'),
@@ -100,7 +95,7 @@ export default defineSchema({
     .index('by_project', ['projectId']),
 
   youtubeTokens: defineTable({
-    userId: v.id('users'), // Convex Auth users table
+    userId: v.string(),
     encryptedRefreshToken: v.string(),
     channelId: v.optional(v.string()),
     channelTitle: v.optional(v.string()),
@@ -108,7 +103,7 @@ export default defineSchema({
 
   youtubeUploads: defineTable({
     projectId: v.id('projects'),
-    userId: v.id('users'),
+    userId: v.string(),
     renderJobId: v.id('renderJobs'),
     youtubeVideoId: v.optional(v.string()),
     title: v.string(),

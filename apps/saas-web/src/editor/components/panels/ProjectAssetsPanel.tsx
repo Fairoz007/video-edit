@@ -80,7 +80,7 @@ export function ProjectAssetsPanel() {
       </div>
       {status && <p className="text-[10px] text-forge-cyan/90">{status}</p>}
       <ul className="space-y-1 max-h-32 overflow-y-auto text-[10px]">
-        {assets?.map((a: { _id: string; kind: string; cdnUrl: string; sizeBytes?: number }) => (
+        {assets?.map((a) => (
           <li key={a._id} className="flex justify-between gap-1 border border-forge-border/20 rounded p-1.5">
             <a href={a.cdnUrl} target="_blank" rel="noreferrer" className="truncate text-gray-400 hover:text-forge-cyan">
               {a.kind} · {formatBytes(a.sizeBytes)}
